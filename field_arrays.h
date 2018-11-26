@@ -54,7 +54,7 @@ private:
 
 template<typename... FieldDescriptors>
 inline
-FieldArrays<FieldDescriptors...> make_field_arrays(const FieldDescriptors&... fdt)
+FieldArrays<FieldDescriptors...> make_field_arrays(FieldDescriptors...)
 {
 	return FieldArrays<FieldDescriptors...>();
 }

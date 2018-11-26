@@ -30,6 +30,28 @@ static inline void compute_distance( double& dist, double x, double y, double z,
 	dist = std::exp(x2+y2+z2) / std::sqrt( x*x + y*y + z*z );
 }
 
+template<typename OperatorT, typename... ArrayP>
+static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP __restrict__ ... arraypack )
+{
+	size_t last = first+N;
+	#pragma omp simd
+	for(size_t i=first;i<last;i++)
+	{
+		f( arraypack[i] ... );
+	}
+}
+
+template<typename OperatorT, typename... FieldDescriptors >
+static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, FieldArrays<FieldDescriptors...> field_arrays)
+{
+	size_t last = first+N;
+	#pragma omp simd
+	for(size_t i=first;i<last;i++)
+	{
+		f( field_arrays.get(FieldDescriptors())[i] ... );
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	static constexpr size_t CHUNK_SIZE = 16;
@@ -50,6 +72,10 @@ int main(int argc, char* argv[])
 
 	auto cell_arrays1 = make_field_arrays( rx,ry,rz,e,dist );
 	auto cell_arrays2 = make_field_arrays( atype,rx,mid,ry,rz );
+
+	// rebind operator ?
+	// zip operator ?
+	// embed several field_arrays ?
 
 	// zip arrays
 
@@ -83,24 +109,9 @@ int main(int argc, char* argv[])
 		m_ptr[i] = static_cast<unsigned int>( at_ptr[i] + rdist(rng)*500 );
 		dist_ptr[i] = static_cast<unsigned int>( at_ptr[i] + rdist(rng)*500 );
 	}
-
-	#pragma omp simd
-	for(size_t i=0;i<N;i++)
-	{
-#if 0
-		double x = rx_ptr[i];
-		double y = ry_ptr[i];
-		double z = rz_ptr[i];
-		double x2 = rx2_ptr[i];
-		double y2 = ry2_ptr[i];
-		double z2 = ry2_ptr[i];
-		x = x - x2;
-		y = y - y2;
-		z = z - z2;
-		dist_ptr[i] = std::exp(x2+y2+z2) / std::sqrt( x*x + y*y + z*z );
-#endif
-		compute_distance( dist_ptr[i], rx_ptr[i], ry_ptr[i], rz_ptr[i], rx2_ptr[i], ry2_ptr[i], rz2_ptr[i] );
-	}
+	
+	apply_to_arrays( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
+	//apply_to_field_arrays( compute_distance , 0, N, cell_arrays1 );
 
 	for(size_t j=0;j<N;j++)
 	{

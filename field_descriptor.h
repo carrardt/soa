@@ -8,11 +8,9 @@ struct FieldDataDescriptor
 	using value_type = _T;
 	static constexpr int FieldId = _Id;
 
+	inline FieldDataDescriptor() {}
 	inline FieldDataDescriptor(const std::string& n) : m_name(n) {}
 	inline const std::string& name() const { return m_name; }
-
-	// permet de decrire la facon dont on veut acceder a un element
-	inline const FieldDataDescriptor& read_only() const { return *this; }
 
 private:
 	const std::string m_name;
