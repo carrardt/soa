@@ -4,6 +4,10 @@
 #include "field_descriptor.h"
 #include <memory> // for std::alocator_traits
 
+#include "assert.h"
+
+#include "soatl_constants.h"
+
 namespace soatl {
 
 template<int N> struct _FieldArraysTupleHelper;
@@ -37,9 +41,10 @@ template<> struct _FieldArraysTupleHelper<0>
 	static inline void init( std::tuple<FieldDescriptors...>& arrays) {}
 };
 
-template<typename... FieldDescriptors>
+template<size_t _ChunkSize, typename... FieldDescriptors>
 struct FieldArrays
 {
+	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	using ArrayTuple = std::tuple< typename FieldDescriptors::value_type* ... > ;
 	using TupleHelper = _FieldArraysTupleHelper< sizeof...(FieldDescriptors) >;
 
@@ -62,20 +67,34 @@ struct FieldArrays
 		return std::get<index>(m_field_arrays);
 	}
 
+	inline void adjustCapacity()
+	{
+		reallocate( ( ( m_size + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
+	}
+
 	inline void resize(size_t s)
 	{
 		m_size = s;
-		m_capacity = s;
-		TupleHelper::reallocate( m_field_arrays , s );
+		if( m_size > m_capacity || ( m_size <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
+		{
+			adjustCapacity();
+		}
 	}
 
 	inline size_t size() const { return m_size; }
 	inline size_t capacity() const { return m_capacity; }
 
 	static inline constexpr size_t alignment() { return 1; }
-	static inline constexpr size_t chunksize() { return 1; }
+	static inline constexpr size_t chunksize() { return ChunkSize; }
 
 private:
+	inline void reallocate(size_t s)
+	{
+		assert( ( s % ChunkSize ) == 0 );
+		m_capacity = s;
+		TupleHelper::reallocate( m_field_arrays , m_capacity );
+	}
+
 	ArrayTuple m_field_arrays;
 	size_t m_size = 0;
 	size_t m_capacity = 0;
@@ -83,11 +102,17 @@ private:
 
 template<typename... FieldDescriptors>
 inline
-FieldArrays<FieldDescriptors...> make_field_arrays(FieldDescriptors...)
+FieldArrays<DEFAULT_CHUNK_SIZE,FieldDescriptors...> make_field_arrays(FieldDescriptors...)
 {
-	return FieldArrays<FieldDescriptors...>();
+	return FieldArrays<DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
 }
 
+template<size_t C,typename... FieldDescriptors>
+inline
+FieldArrays<C,FieldDescriptors...> make_field_arrays(cst::chunk<C>, FieldDescriptors...)
+{
+	return FieldArrays<C,FieldDescriptors...>();
+}
 
 } // namespace soatl
 

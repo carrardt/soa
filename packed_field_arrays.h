@@ -6,10 +6,9 @@
 
 #include <assert.h>
 
-namespace soatl {
+#include "soatl_constants.h"
 
-static constexpr size_t DEFAULT_ALIGNMENT_LOG2 = 6;
-static constexpr size_t DEFAULT_CHUNK_SIZE = 16;
+namespace soatl {
 
 template< size_t _AlignmentLog2, size_t _ChunkSize, typename... FieldDescriptors>
 struct PackedFieldArrays
@@ -58,22 +57,9 @@ struct PackedFieldArrays
 		return ( alloc_size + AlignmentLowMask ) & AlignmentHighMask;
 	}
 
-	inline void reallocate(size_t s)
-	{
-		m_capacity = s;
-		size_t needed_space = unaligned_allocation_size();
-		size_t total_space = aligned_allocation_size();
-		m_storage_ptr = realloc( m_storage_ptr , total_space );
-		size_t aligned_addr = reinterpret_cast<size_t>( m_storage_ptr );
-		aligned_addr = ( aligned_addr + AlignmentLowMask ) & AlignmentHighMask;
-		m_aligned_ptr = reinterpret_cast<void*>( aligned_addr );
-		assert( m_aligned_ptr!=nullptr || m_capacity==0 );
-	}
-
-	inline void adjust()
+	inline void adjustCapacity()
 	{
 		reallocate( ( ( m_size + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
-		assert( ( m_capacity % ChunkSize ) == 0 );
 	}
 
 	inline void resize(size_t s)
@@ -81,7 +67,7 @@ struct PackedFieldArrays
 		m_size = s;
 		if( m_size > m_capacity || ( m_size <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
 		{
-			adjust();
+			adjustCapacity();
 		}
 	}
 
@@ -94,6 +80,19 @@ struct PackedFieldArrays
 	inline size_t capacity() const { return m_capacity; }
 
 private:
+	inline void reallocate(size_t s)
+	{
+		assert( ( s % ChunkSize ) == 0 );
+		m_capacity = s;
+		size_t needed_space = unaligned_allocation_size();
+		size_t total_space = aligned_allocation_size();
+		m_storage_ptr = realloc( m_storage_ptr , total_space );
+		size_t aligned_addr = reinterpret_cast<size_t>( m_storage_ptr );
+		aligned_addr = ( aligned_addr + AlignmentLowMask ) & AlignmentHighMask;
+		m_aligned_ptr = reinterpret_cast<void*>( aligned_addr );
+		assert( m_aligned_ptr!=nullptr || m_capacity==0 );
+	}
+
 	size_t m_size = 0;	
 	size_t m_capacity = 0;
 
@@ -107,19 +106,6 @@ PackedFieldArrays<DEFAULT_ALIGNMENT_LOG2,DEFAULT_CHUNK_SIZE,FieldDescriptors...>
 make_packed_field_arrays(const FieldDescriptors&... fdt)
 {
 	return PackedFieldArrays<DEFAULT_ALIGNMENT_LOG2,DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
-}
-
-namespace cst
-{
-	template<size_t> struct align {};
-	template<size_t> struct chunk {};
-}
-
-namespace _priv
-{
-	template<size_t N> struct Log2 { static constexpr size_t value = Log2<N/2>::value+1; };
-	template<> struct Log2<1> { static constexpr size_t value = 0; };
-	template<> struct Log2<0> { static constexpr size_t value = 0; };
 }
 
 template<size_t A, size_t C, typename... FieldDescriptors>

@@ -28,7 +28,6 @@ enum ParticleField
 	PARTICLE_FIELD_COUNT
 };
 
-
 static inline void compute_distance( double& dist, double x, double y, double z, double x2, double y2, double z2 )
 {
 	x = x - x2;
@@ -48,8 +47,8 @@ static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP 
 	}
 }
 
-template<typename OperatorT, typename... FieldDescriptors >
-static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<FieldDescriptors...>& field_arrays)
+template<typename OperatorT, size_t C, typename... FieldDescriptors >
+static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<C,FieldDescriptors...>& field_arrays)
 {
 	size_t last = first+N;
 	#pragma omp simd
@@ -128,9 +127,10 @@ static inline void test_packed_field_arrays_aliasing()
 
 }
 
+template<size_t C>
 static inline void test_field_arrays_aliasing()
 {
-	std::cout<<"test_field_arrays_aliasing"<<std::endl;	
+	std::cout<<"test_field_arrays_aliasing<"<<C<<">"<<std::endl;	
 
 	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
 	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
@@ -143,21 +143,21 @@ static inline void test_field_arrays_aliasing()
 	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
 
 	{
-		auto field_arrays = soatl::make_field_arrays( atype,rx,mid,ry,dist,rz,tmp1 );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
 	}
 
 	{
-		auto field_arrays = soatl::make_field_arrays( atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
 	}
 
 	{
-		auto field_arrays = soatl::make_field_arrays( rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -170,25 +170,26 @@ int main(int argc, char* argv[])
 	test_packed_field_arrays_aliasing<1,1>();
 	test_packed_field_arrays_aliasing<1,2>();
 	test_packed_field_arrays_aliasing<1,3>();
-	test_packed_field_arrays_aliasing<1,4>();
 	test_packed_field_arrays_aliasing<1,6>();
 	test_packed_field_arrays_aliasing<1,16>();
 
 	test_packed_field_arrays_aliasing<16,1>();
 	test_packed_field_arrays_aliasing<16,2>();
 	test_packed_field_arrays_aliasing<16,3>();
-	test_packed_field_arrays_aliasing<16,4>();
 	test_packed_field_arrays_aliasing<16,6>();
 	test_packed_field_arrays_aliasing<16,16>();
 
 	test_packed_field_arrays_aliasing<64,1>();
 	test_packed_field_arrays_aliasing<64,2>();
 	test_packed_field_arrays_aliasing<64,3>();
-	test_packed_field_arrays_aliasing<64,4>();
 	test_packed_field_arrays_aliasing<64,6>();
 	test_packed_field_arrays_aliasing<64,16>();
 
-	test_field_arrays_aliasing();
+	test_field_arrays_aliasing<1>();
+	test_field_arrays_aliasing<2>();
+	test_field_arrays_aliasing<3>();
+	test_field_arrays_aliasing<6>();
+	test_field_arrays_aliasing<16>();
 
 	int seed = 0;
 	size_t N = 10000;
@@ -207,7 +208,7 @@ int main(int argc, char* argv[])
 	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
 
 	auto cell_arrays1 = soatl::make_field_arrays( rx,ry,rz,e,dist );
-	auto cell_arrays2 = soatl::make_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<16>(), atype,rx,mid,ry,rz );
+	auto cell_arrays2 = soatl::make_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), atype,rx,mid,ry,rz );
 
 	//check_field_arrays_aliasing(N,cell_arrays2 , atype,rx,mid,ry,rz );
 
