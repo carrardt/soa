@@ -51,7 +51,6 @@ private:
 	ArrayTuple m_field_arrays;
 };
 
-
 template<typename... FieldDescriptors>
 inline
 FieldArrays<FieldDescriptors...> make_field_arrays(FieldDescriptors...)

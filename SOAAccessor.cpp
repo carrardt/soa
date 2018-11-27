@@ -6,6 +6,7 @@
 
 #include "field_descriptor.h"
 #include "field_arrays.h"
+#include "packed_field_arrays.h"
 
 enum ParticleField
 {
@@ -71,8 +72,7 @@ int main(int argc, char* argv[])
 	FieldDataDescriptor<double,PARTICLE_DIST> dist("distance");
 
 	auto cell_arrays1 = make_field_arrays( rx,ry,rz,e,dist );
-	auto cell_arrays2 = make_field_arrays( atype,rx,mid,ry,rz );
-
+	auto cell_arrays2 = soatl::make_packed_field_arrays( atype,rx,mid,ry,rz );
 	// rebind operator ?
 	// zip operator ?
 	// embed several field_arrays ?
@@ -80,7 +80,14 @@ int main(int argc, char* argv[])
 	// zip arrays
 
 	cell_arrays1.allocate(N);
-	cell_arrays2.allocate(N);
+	cell_arrays2.resize(N);
+
+	std::cout<<"atype " << (void*) cell_arrays2.get(atype) << " / " << (void*)( cell_arrays2.get(atype) + cell_arrays2.capacity() ) << std::endl;
+	std::cout<<"rx " << (void*) cell_arrays2.get(rx) << " / " << (void*)( cell_arrays2.get(rx) + cell_arrays2.capacity() ) << std::endl;
+	std::cout<<"mid " << (void*) cell_arrays2.get(mid) << " / " << (void*)( cell_arrays2.get(mid) + cell_arrays2.capacity() ) << std::endl;
+	std::cout<<"ry " << (void*) cell_arrays2.get(ry) << " / " << (void*)( cell_arrays2.get(ry) + cell_arrays2.capacity() ) << std::endl;
+	std::cout<<"rz " << (void*) cell_arrays2.get(rz) << " / " << (void*)( cell_arrays2.get(rz) + cell_arrays2.capacity() ) << std::endl;
+
 
 	double* __restrict__ rx_ptr = static_cast<double*>( __builtin_assume_aligned( cell_arrays1.get(rx) , 64 ) );
 	double* __restrict__ ry_ptr = static_cast<double*>( __builtin_assume_aligned( cell_arrays1.get(ry) , 64 ) );
