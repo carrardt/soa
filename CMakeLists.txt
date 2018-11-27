@@ -15,7 +15,7 @@ set(CMAKE_CXX_EXTENSIONS NO)
 find_package(OpenMP REQUIRED)
 
 # ExaStamp binary 
-add_executable(soatest SOAAccessor.cpp)
+add_executable(soatest soatest.cpp)
 target_compile_options(soatest PUBLIC ${OpenMP_CXX_FLAGS})
 target_link_libraries(soatest ${OpenMP_LIBRARIES})
 
