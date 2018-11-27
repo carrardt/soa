@@ -8,6 +8,8 @@
 #include "field_arrays.h"
 #include "packed_field_arrays.h"
 
+#include "variadic_template_utils.h"
+
 enum ParticleField
 {
 	PARTICLE_RX,
@@ -27,7 +29,6 @@ enum ParticleField
 };
 
 
-//#pragma omp declare simd
 static inline void compute_distance( double& dist, double x, double y, double z, double x2, double y2, double z2 )
 {
 	x = x - x2;
@@ -58,17 +59,6 @@ static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, c
 	}
 }
 
-
-struct __pass
-{
-    template<typename ...T> __pass(T...) {}
-};
-#define TEMPLATE_LIST_BEGIN 	__pass{(
-#define TEMPLATE_LIST_END 	,1)...};
-
-
-
-
 // WARNING: assumes that elements in arrays support 'operator = (const size_t&)' and 'operator == (const size_t&)'
 template<typename FieldsT, typename... FieldDescriptors>
 static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const FieldDescriptors & ... fd )
@@ -87,15 +77,16 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 			TEMPLATE_LIST_END
 		}
 		k=0;
-		bool values_ok = true;
 		for(size_t i=0;i<j;i++)
                 {
+			bool value_ok = false;
 			TEMPLATE_LIST_BEGIN
-				values_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
-				assert(values_ok) ,
+				value_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				assert(value_ok) ,
 				++k
 			TEMPLATE_LIST_END
 		}
+		//std::cout<<k<<" values tested"<<std::endl;
 	}
 }
 
