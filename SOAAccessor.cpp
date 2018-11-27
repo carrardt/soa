@@ -17,10 +17,15 @@ enum ParticleField
 	PARTICLE_ATOM_TYPE,
 	PARITCLE_MOLECULE_ID,
 
-	PARTICLE_DIST,
+	PARTICLE_PAIR_DIST,
+
+	PARTICLE_TMP1,
+	PARTICLE_TMP2,
+	PARTICLE_TMP3,
 
 	PARTICLE_FIELD_COUNT
 };
+
 
 //#pragma omp declare simd
 static inline void compute_distance( double& dist, double x, double y, double z, double x2, double y2, double z2 )
@@ -43,7 +48,7 @@ static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP 
 }
 
 template<typename OperatorT, typename... FieldDescriptors >
-static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, FieldArrays<FieldDescriptors...> field_arrays)
+static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<FieldDescriptors...>& field_arrays)
 {
 	size_t last = first+N;
 	#pragma omp simd
@@ -53,9 +58,146 @@ static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, F
 	}
 }
 
+
+struct __pass
+{
+    template<typename ...T> __pass(T...) {}
+};
+#define TEMPLATE_LIST_BEGIN 	__pass{(
+#define TEMPLATE_LIST_END 	,1)...};
+
+
+
+
+// WARNING: assumes that elements in arrays support 'operator = (const size_t&)' and 'operator == (const size_t&)'
+template<typename FieldsT, typename... FieldDescriptors>
+static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const FieldDescriptors & ... fd )
+{
+	std::cout<<"check_field_arrays_aliasing: align="<<field_arrays.alignment()<<", chunksize="<<field_arrays.chunksize()<<std::endl;
+        for(size_t j=1;j<=N;j++)
+        {
+                field_arrays.resize(j);
+		//std::cout<<"check_field_arrays_aliasing: size="<<field_arrays.size()<<", capacity="<<field_arrays.capacity()<<std::endl;
+		size_t k=0;
+		for(size_t i=0;i<j;i++)
+                {
+			TEMPLATE_LIST_BEGIN
+				field_arrays.get( FieldDescriptors() )[i] = static_cast<typename FieldDescriptors::value_type>( k ) ,
+				++k
+			TEMPLATE_LIST_END
+		}
+		k=0;
+		bool values_ok = true;
+		for(size_t i=0;i<j;i++)
+                {
+			TEMPLATE_LIST_BEGIN
+				values_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				assert(values_ok) ,
+				++k
+			TEMPLATE_LIST_END
+		}
+	}
+}
+
+template<size_t A, size_t C>
+static inline void test_packed_field_arrays_aliasing()
+{
+	std::cout<<"test_pack_field_arrays_aliasing<"<<A<<","<<C<<">"<<std::endl;
+
+	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
+	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
+	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
+	FieldDataDescriptor<float,PARTICLE_E> e("e");
+	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
+	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
+	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
+	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
+	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
+
+	{
+		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063, field_arrays , atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
+	}
+
+	{
+		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
+	}
+
+	{
+		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
+	}
+
+}
+
+static inline void test_field_arrays_aliasing()
+{
+	std::cout<<"test_field_arrays_aliasing"<<std::endl;	
+
+	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
+	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
+	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
+	FieldDataDescriptor<float,PARTICLE_E> e("e");
+	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
+	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
+	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
+	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
+	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
+
+	{
+		auto field_arrays = soatl::make_field_arrays( atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
+	}
+
+	{
+		auto field_arrays = soatl::make_field_arrays( atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
+	}
+
+	{
+		auto field_arrays = soatl::make_field_arrays( rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
+		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
+	}
+}
+
+
 int main(int argc, char* argv[])
 {
-	static constexpr size_t CHUNK_SIZE = 16;
+	test_packed_field_arrays_aliasing<1,1>();
+	test_packed_field_arrays_aliasing<1,2>();
+	test_packed_field_arrays_aliasing<1,3>();
+	test_packed_field_arrays_aliasing<1,4>();
+	test_packed_field_arrays_aliasing<1,6>();
+	test_packed_field_arrays_aliasing<1,16>();
+
+	test_packed_field_arrays_aliasing<16,1>();
+	test_packed_field_arrays_aliasing<16,2>();
+	test_packed_field_arrays_aliasing<16,3>();
+	test_packed_field_arrays_aliasing<16,4>();
+	test_packed_field_arrays_aliasing<16,6>();
+	test_packed_field_arrays_aliasing<16,16>();
+
+	test_packed_field_arrays_aliasing<64,1>();
+	test_packed_field_arrays_aliasing<64,2>();
+	test_packed_field_arrays_aliasing<64,3>();
+	test_packed_field_arrays_aliasing<64,4>();
+	test_packed_field_arrays_aliasing<64,6>();
+	test_packed_field_arrays_aliasing<64,16>();
+
+	test_field_arrays_aliasing();
 
 	int seed = 0;
 	size_t N = 10000;
@@ -66,28 +208,25 @@ int main(int argc, char* argv[])
 	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
 	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
 	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
-	FieldDataDescriptor<double,PARTICLE_E> e("e");
+	FieldDataDescriptor<float,PARTICLE_E> e("e");
 	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
-	FieldDataDescriptor<int,PARITCLE_MOLECULE_ID> mid("molecule");
-	FieldDataDescriptor<double,PARTICLE_DIST> dist("distance");
+	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
+	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
+	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
+	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
 
-	auto cell_arrays1 = make_field_arrays( rx,ry,rz,e,dist );
-	auto cell_arrays2 = soatl::make_packed_field_arrays( atype,rx,mid,ry,rz );
+	auto cell_arrays1 = soatl::make_field_arrays( rx,ry,rz,e,dist );
+	auto cell_arrays2 = soatl::make_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<16>(), atype,rx,mid,ry,rz );
+
+	//check_field_arrays_aliasing(N,cell_arrays2 , atype,rx,mid,ry,rz );
+
 	// rebind operator ?
 	// zip operator ?
 	// embed several field_arrays ?
 
 	// zip arrays
-
-	cell_arrays1.allocate(N);
+	cell_arrays1.resize(N);
 	cell_arrays2.resize(N);
-
-	std::cout<<"atype " << (void*) cell_arrays2.get(atype) << " / " << (void*)( cell_arrays2.get(atype) + cell_arrays2.capacity() ) << std::endl;
-	std::cout<<"rx " << (void*) cell_arrays2.get(rx) << " / " << (void*)( cell_arrays2.get(rx) + cell_arrays2.capacity() ) << std::endl;
-	std::cout<<"mid " << (void*) cell_arrays2.get(mid) << " / " << (void*)( cell_arrays2.get(mid) + cell_arrays2.capacity() ) << std::endl;
-	std::cout<<"ry " << (void*) cell_arrays2.get(ry) << " / " << (void*)( cell_arrays2.get(ry) + cell_arrays2.capacity() ) << std::endl;
-	std::cout<<"rz " << (void*) cell_arrays2.get(rz) << " / " << (void*)( cell_arrays2.get(rz) + cell_arrays2.capacity() ) << std::endl;
-
 
 	double* __restrict__ rx_ptr = static_cast<double*>( __builtin_assume_aligned( cell_arrays1.get(rx) , 64 ) );
 	double* __restrict__ ry_ptr = static_cast<double*>( __builtin_assume_aligned( cell_arrays1.get(ry) , 64 ) );

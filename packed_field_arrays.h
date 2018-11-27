@@ -14,11 +14,14 @@ static constexpr size_t DEFAULT_CHUNK_SIZE = 16;
 template< size_t _AlignmentLog2, size_t _ChunkSize, typename... FieldDescriptors>
 struct PackedFieldArrays
 {
-	static constexpr size_t Alignment = 1ul<<_AlignmentLog2;
+	static constexpr size_t Alignment = (_AlignmentLog2<3) ? 8 : (1ul<<_AlignmentLog2);
 	static constexpr size_t AlignmentLowMask = ( 1ul << _AlignmentLog2 ) - 1;
 	static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
-	static constexpr size_t ChunkSize = _ChunkSize;
+	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr int TupleSize = sizeof...(FieldDescriptors);
+
+	static constexpr size_t alignment() { return Alignment; }
+	static constexpr size_t chunksize() { return ChunkSize; }
 
 	template<typename _T,int _Id>
 	inline typename FieldDataDescriptor<_T,_Id>::value_type* get(FieldDataDescriptor<_T,_Id>)
@@ -104,6 +107,27 @@ PackedFieldArrays<DEFAULT_ALIGNMENT_LOG2,DEFAULT_CHUNK_SIZE,FieldDescriptors...>
 make_packed_field_arrays(const FieldDescriptors&... fdt)
 {
 	return PackedFieldArrays<DEFAULT_ALIGNMENT_LOG2,DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
+}
+
+namespace cst
+{
+	template<size_t> struct align {};
+	template<size_t> struct chunk {};
+}
+
+namespace _priv
+{
+	template<size_t N> struct Log2 { static constexpr size_t value = Log2<N/2>::value+1; };
+	template<> struct Log2<1> { static constexpr size_t value = 0; };
+	template<> struct Log2<0> { static constexpr size_t value = 0; };
+}
+
+template<size_t A, size_t C, typename... FieldDescriptors>
+inline
+PackedFieldArrays<_priv::Log2<A>::value,C,FieldDescriptors...>
+make_packed_field_arrays( cst::align<A>, cst::chunk<C>, const FieldDescriptors&... fdt)
+{
+	return PackedFieldArrays<_priv::Log2<A>::value,C,FieldDescriptors...>();
 }
 
 
