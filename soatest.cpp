@@ -4,11 +4,10 @@
 #include <random>
 #include <cmath>
 
-#include "field_descriptor.h"
-#include "field_arrays.h"
-#include "packed_field_arrays.h"
-
-#include "variadic_template_utils.h"
+#include "soatl/field_descriptor.h"
+#include "soatl/field_arrays.h"
+#include "soatl/packed_field_arrays.h"
+#include "soatl/variadic_template_utils.h"
 
 enum ParticleField
 {

@@ -6,7 +6,7 @@
 
 #include <assert.h>
 
-#include "soatl_constants.h"
+#include "soatl/constants.h"
 
 namespace soatl {
 
