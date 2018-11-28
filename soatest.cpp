@@ -8,6 +8,7 @@
 #include "soatl/field_arrays.h"
 #include "soatl/packed_field_arrays.h"
 #include "soatl/variadic_template_utils.h"
+#include "soatl/field_pointers.h"
 
 enum ParticleField
 {
@@ -46,8 +47,8 @@ static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP 
 	}
 }
 
-template<typename OperatorT, size_t C, typename... FieldDescriptors >
-static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<C,FieldDescriptors...>& field_arrays)
+template<typename OperatorT, size_t A, size_t C, typename... FieldDescriptors >
+static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<A,C,FieldDescriptors...>& field_arrays)
 {
 	size_t last = first+N;
 	#pragma omp simd
@@ -86,6 +87,13 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 		}
 		//std::cout<<k<<" values tested"<<std::endl;
 	}
+
+	field_arrays.resize(0);
+	void* ptr;
+	TEMPLATE_LIST_BEGIN
+		ptr = field_arrays.get( FieldDescriptors() ) ,
+		assert(ptr==nullptr) 
+	TEMPLATE_LIST_END
 }
 
 template<size_t A, size_t C>
@@ -126,7 +134,7 @@ static inline void test_packed_field_arrays_aliasing()
 
 }
 
-template<size_t C>
+template<size_t A, size_t C>
 static inline void test_field_arrays_aliasing()
 {
 	std::cout<<"test_field_arrays_aliasing<"<<C<<">"<<std::endl;	
@@ -142,21 +150,21 @@ static inline void test_field_arrays_aliasing()
 	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
 
 	{
-		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
 	}
 
 	{
-		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
 	}
 
 	{
-		auto field_arrays = soatl::make_field_arrays( soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -184,11 +192,23 @@ int main(int argc, char* argv[])
 	test_packed_field_arrays_aliasing<64,6>();
 	test_packed_field_arrays_aliasing<64,16>();
 
-	test_field_arrays_aliasing<1>();
-	test_field_arrays_aliasing<2>();
-	test_field_arrays_aliasing<3>();
-	test_field_arrays_aliasing<6>();
-	test_field_arrays_aliasing<16>();
+	test_field_arrays_aliasing<1,1>();
+	test_field_arrays_aliasing<1,2>();
+	test_field_arrays_aliasing<1,3>();
+	test_field_arrays_aliasing<1,6>();
+	test_field_arrays_aliasing<1,16>();
+
+	test_field_arrays_aliasing<8,1>();
+	test_field_arrays_aliasing<8,2>();
+	test_field_arrays_aliasing<8,3>();
+	test_field_arrays_aliasing<8,6>();
+	test_field_arrays_aliasing<8,16>();
+
+	test_field_arrays_aliasing<64,1>();
+	test_field_arrays_aliasing<64,2>();
+	test_field_arrays_aliasing<64,3>();
+	test_field_arrays_aliasing<64,6>();
+	test_field_arrays_aliasing<64,16>();
 
 	int seed = 0;
 	size_t N = 10000;
@@ -254,6 +274,9 @@ int main(int argc, char* argv[])
 	{
 		std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl;
 	}
+
+	auto zip = soatl::make_field_pointers( N, soatl::cst::align<64>(), soatl::cst::chunk<8>(), atype,rx,mid,ry,rz );
+
 }
 
 

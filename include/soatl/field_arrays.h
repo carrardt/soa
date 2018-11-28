@@ -2,107 +2,35 @@
 
 #include <cstdlib> // for size_t
 #include <memory> // for std::alocator_traits
+#include <algorithm> // for std::max
 
 #include "assert.h"
 
 #include "soatl/field_descriptor.h"
 #include "soatl/constants.h"
 
+/*
+The  function posix_memalign() allocates size bytes and places the address of the allocated memory in *memptr.  The address of the allocated memory will be a multiple of alignment, which must
+be a power of two and a multiple of sizeof(void *).  If size is 0, then the value placed in *memptr is either NULL, or a unique pointer value that can later be successfully passed to free(3).
+*/
+
 namespace soatl {
 
-template<int N> struct _FieldArraysTupleHelper;
-template<int N> struct _FieldArraysTupleHelper
-{
-	template<typename... FieldPtrs>
-	static inline void init( std::tuple<FieldPtrs...>& arrays)
-	{
-		std::get<N-1>( arrays ) = nullptr;
-		_FieldArraysTupleHelper<N-1>::init( arrays );
-	}
-
-	template<typename... FieldDescriptors>
-	static inline void reallocate( std::tuple<FieldDescriptors...>& arrays, size_t s)
-	{
-		using ValueType = typename std::decay< decltype( * std::get<N-1>( arrays ) ) >::type;
-		auto ptr = std::get<N-1>( arrays );
-		if( ptr != nullptr ) { delete [] ptr; }
-		if( s > 0 ) { std::get<N-1>( arrays ) = new ValueType [ s ]; }
-		else { std::get<N-1>( arrays ) = nullptr;  }
-		_FieldArraysTupleHelper<N-1>::reallocate( arrays, s );
-	}
-};
-
-template<> struct _FieldArraysTupleHelper<0>
-{
-	template<typename... FieldDescriptors>
-	static inline void reallocate( std::tuple<FieldDescriptors...>& arrays, size_t s) {}
-
-	template<typename... FieldPtrs>
-	static inline void init( std::tuple<FieldPtrs...>& arrays) {}
-};
-
-// this class hould be private, i.e. not instantiated by user but only through specific operations
-
-template<size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
-struct FieldPointers
-{
-	static constexpr size_t ChunkSize = _ChunkSize;
-	static constexpr size_t Alignment = _Alignment;
-
-	using ArrayTuple = std::tuple< typename FieldDescriptors::value_type* ... > ;
-	using TupleHelper = _FieldArraysTupleHelper< sizeof...(FieldDescriptors) >;
-
-	inline FieldPointers(size_t s) : m_size(s)
-	{
-		TupleHelper::init(m_field_arrays);
-	}
-
-	template<typename _T,int _Id>
-	inline typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>)
-	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
-		return std::get<index>(m_field_arrays);
-	}
-
-	template<typename _T,int _Id>
-	inline const typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>) const
-	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
-		return std::get<index>(m_field_arrays);
-	}
-
-	inline size_t size() const { return m_size; }
-	inline size_t capacity() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
-
-	static inline constexpr size_t alignment() { return Alignment; }
-	static inline constexpr size_t chunksize() { return ChunkSize; }
-
-private:
-
-	ArrayTuple m_field_arrays;
-	size_t m_size = 0;
-};
-
-template<size_t A, size_t C, typename... FieldDescriptors>
-static inline 
-FieldPointers<A,C,FieldDescriptors...>
-make_field_pointers( size_t N, cst::align<A>, cst::chunk<C>, const FieldDescriptors& ... )
-{
-	return FieldPointers<A,C,FieldDescriptors...>( N );
-}
-
-
 // TODO: add alignment
-template<size_t _ChunkSize, typename... FieldDescriptors>
+template<size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
 struct FieldArrays
 {
+        static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
+        static constexpr size_t Alignment = (1ul<<AlignmentLog2);
+        static constexpr size_t AlignmentLowMask = Alignment - 1;
+        static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
+	static constexpr size_t TupleSize = sizeof...(FieldDescriptors);
 	using ArrayTuple = std::tuple< typename FieldDescriptors::value_type* ... > ;
-	using TupleHelper = _FieldArraysTupleHelper< sizeof...(FieldDescriptors) >;
 
 	inline FieldArrays()
 	{
-		TupleHelper::init(m_field_arrays);
+		init( std::integral_constant<size_t,TupleSize>() );
 	}
 
 	template<typename _T,int _Id>
@@ -119,18 +47,18 @@ struct FieldArrays
 		return std::get<index>(m_field_arrays);
 	}
 
-	inline void adjustCapacity()
+	inline void adjustCapacity(size_t s)
 	{
-		reallocate( ( ( m_size + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
+		reallocate( ( ( s + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
 	}
 
 	inline void resize(size_t s)
 	{
-		m_size = s;
-		if( m_size > m_capacity || ( m_size <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
+		if( s > m_capacity || ( s <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
 		{
-			adjustCapacity();
+			adjustCapacity( s );
 		}
+		m_size = s;
 	}
 
 	inline size_t size() const { return m_size; }
@@ -140,30 +68,66 @@ struct FieldArrays
 	static inline constexpr size_t chunksize() { return ChunkSize; }
 
 private:
+
+	template<size_t N>
+	inline void init( std::integral_constant<size_t,N> )
+	{
+		std::get<N-1>( m_field_arrays ) = nullptr;
+		init( std::integral_constant<size_t,N-1>() );
+	}
+	inline void init( std::integral_constant<size_t,0> ) {}
+
+	template<size_t N>
+	inline void reallocate_pointer( std::integral_constant<size_t,N> , size_t s )
+	{
+		using ValueType = typename std::decay< decltype( * std::get<N-1>( m_field_arrays ) ) >::type;
+		ValueType * old_ptr = std::get<N-1>( m_field_arrays );
+		ValueType * new_ptr = nullptr;
+		if( s > 0 )
+		{
+			void* memptr =nullptr;
+			size_t a = std::max( alignment() , sizeof(void*) ); // this is required by posix_memalign.
+			int r = posix_memalign( &memptr, a, s );
+			assert( r == 0 );
+			new_ptr = reinterpret_cast<ValueType*>( memptr );
+		}
+		if( old_ptr!=nullptr && new_ptr!=nullptr )
+		{
+			size_t cs = m_size;
+			if( s < cs ) { cs = s; }
+			for(size_t i=0;i<cs;i++) { new_ptr[i] = old_ptr[i]; }
+		}
+		if( old_ptr!=nullptr ) { delete [] old_ptr; }
+		std::get<N-1>( m_field_arrays ) = new_ptr;
+		reallocate_pointer( std::integral_constant<size_t,N-1>() , s );
+	}
+	inline void reallocate_pointer( std::integral_constant<size_t,0> , size_t s ) {}
+
 	inline void reallocate(size_t s)
 	{
 		assert( ( s % ChunkSize ) == 0 );
+		reallocate_pointer( std::integral_constant<size_t,TupleSize>() , s );
 		m_capacity = s;
-		TupleHelper::reallocate( m_field_arrays , m_capacity );
 	}
 
 	ArrayTuple m_field_arrays;
+
 	size_t m_size = 0;
 	size_t m_capacity = 0;
 };
 
 template<typename... FieldDescriptors>
 inline
-FieldArrays<DEFAULT_CHUNK_SIZE,FieldDescriptors...> make_field_arrays(FieldDescriptors...)
+FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...> make_field_arrays(FieldDescriptors...)
 {
-	return FieldArrays<DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
+	return FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
 }
 
-template<size_t C,typename... FieldDescriptors>
+template<size_t A, size_t C,typename... FieldDescriptors>
 inline
-FieldArrays<C,FieldDescriptors...> make_field_arrays(cst::chunk<C>, FieldDescriptors...)
+FieldArrays<A,C,FieldDescriptors...> make_field_arrays(cst::align<A>, cst::chunk<C>, FieldDescriptors...)
 {
-	return FieldArrays<C,FieldDescriptors...>();
+	return FieldArrays<A,C,FieldDescriptors...>();
 }
 
 } // namespace soatl
