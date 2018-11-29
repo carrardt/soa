@@ -10,6 +10,8 @@
 #include "soatl/variadic_template_utils.h"
 #include "soatl/field_pointers.h"
 
+std::default_random_engine rng;
+
 enum ParticleField
 {
 	PARTICLE_RX,
@@ -62,10 +64,24 @@ static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, c
 template<typename FieldsT, typename... FieldDescriptors>
 static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const FieldDescriptors & ... fd )
 {
+	std::uniform_int_distribution<> rndist(0,N*2);
 	std::cout<<"check_field_arrays_aliasing: align="<<field_arrays.alignment()<<", chunksize="<<field_arrays.chunksize()<<std::endl;
         for(size_t j=1;j<=N;j++)
         {
                 field_arrays.resize(j);
+
+		// test pointer alignment
+		{
+			size_t alignment = field_arrays.alignment();
+			void* ptr;
+			size_t addr;
+			TEMPLATE_LIST_BEGIN
+				ptr = field_arrays.get( FieldDescriptors() ) ,
+				addr = reinterpret_cast<size_t>(ptr) ,
+				assert( ( addr % alignment ) == 0 ) 
+			TEMPLATE_LIST_END
+		}
+
 		//std::cout<<"check_field_arrays_aliasing: size="<<field_arrays.size()<<", capacity="<<field_arrays.capacity()<<std::endl;
 		size_t k=0;
 		for(size_t i=0;i<j;i++)
@@ -79,21 +95,49 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 		for(size_t i=0;i<j;i++)
                 {
 			bool value_ok = false;
+			size_t findex = 0;
 			TEMPLATE_LIST_BEGIN
 				value_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				//std::cout<<"value["<<findex<<"]="<< (size_t)(field_arrays.get( FieldDescriptors() )[i] )<<std::endl ,
 				assert(value_ok) ,
+				++ findex ,
 				++k
 			TEMPLATE_LIST_END
 		}
-		//std::cout<<k<<" values tested"<<std::endl;
+		
+		// test that a resize keeps values
+		size_t ns = rndist(rng);
+		field_arrays.resize( ns );
+		size_t cs = std::min( ns , j );
+		//std::cout<<"resize from "<<j<<" to "<<ns<<", cs="<<cs<< std::endl;
+		k=0;
+		for(size_t i=0;i<cs;i++)
+                {
+			bool value_ok = false;
+			size_t findex = 0;
+			TEMPLATE_LIST_BEGIN
+				value_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				//std::cout<<"value["<<findex<<"]="<< (size_t)( field_arrays.get( FieldDescriptors() )[i] )<<std::endl ,
+				assert(value_ok) ,
+				++ findex ,
+				++k
+			TEMPLATE_LIST_END
+		}
+
 	}
 
-	field_arrays.resize(0);
-	void* ptr;
-	TEMPLATE_LIST_BEGIN
-		ptr = field_arrays.get( FieldDescriptors() ) ,
-		assert(ptr==nullptr) 
-	TEMPLATE_LIST_END
+	// test that all pointers are 0 (nullptr) when capacity is 0
+	{
+		field_arrays.resize(0); // assumes that capacity is adjusted to 0 when container is resized to 0
+		void* ptr;
+		size_t findex = 0;
+		TEMPLATE_LIST_BEGIN
+			ptr = field_arrays.get( FieldDescriptors() ) ,
+			//std::cout<<"ptr["<<findex<<"]="<<ptr<<std::endl ,
+			++findex , 
+			assert(ptr==nullptr) 
+		TEMPLATE_LIST_END
+	}
 }
 
 template<size_t A, size_t C>
@@ -175,6 +219,14 @@ static inline void test_field_arrays_aliasing()
 int main(int argc, char* argv[])
 {
 
+	int seed = 0;
+	size_t N = 10000;
+
+	if(argc>=2) { N=atoi(argv[1]); }
+	if(argc>=3) { seed=atoi(argv[2]); }
+
+	rng.seed( seed );
+
 	test_packed_field_arrays_aliasing<1,1>();
 	test_packed_field_arrays_aliasing<1,2>();
 	test_packed_field_arrays_aliasing<1,3>();
@@ -211,12 +263,6 @@ int main(int argc, char* argv[])
 	test_field_arrays_aliasing<64,6>();
 	test_field_arrays_aliasing<64,16>();
 
-	int seed = 0;
-	size_t N = 10000;
-
-	if(argc>=2) { N=atoi(argv[1]); }
-	if(argc>=3) { seed=atoi(argv[2]); }
-
 	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
 	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
 	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
@@ -251,7 +297,6 @@ int main(int argc, char* argv[])
 	int* __restrict__ m_ptr = static_cast<int*>( __builtin_assume_aligned( cell_arrays2.get(mid) , 64 ) );
 	double* __restrict__ dist_ptr = static_cast<double*>( __builtin_assume_aligned( cell_arrays1.get(dist) , 64 ) );
 
-	std::mt19937 rng(seed);
 	std::uniform_real_distribution<> rdist(0.0,1.0);
 
 	for(size_t i=0;i<N;i++)

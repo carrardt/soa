@@ -7,6 +7,8 @@
 #include <assert.h>
 
 #include "soatl/constants.h"
+#include "soatl/copy.h"
+#include "soatl/variadic_template_utils.h"
 
 namespace soatl {
 
@@ -32,7 +34,6 @@ struct PackedFieldArraysHelper<A,0,FieldDescriptors...>
 	static inline constexpr size_t field_offset(size_t) { return 0; }
 };
 
-
 template< size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
 struct PackedFieldArrays
 {
@@ -43,17 +44,25 @@ struct PackedFieldArrays
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr int TupleSize = sizeof...(FieldDescriptors);
 
+	using FieldDescriptorTuple = std::tuple<FieldDescriptors...> ;
+
 	static constexpr size_t alignment() { return Alignment; }
 	static constexpr size_t chunksize() { return ChunkSize; }
 
-	template<typename _T,int _Id>
-	inline typename FieldDataDescriptor<_T,_Id>::value_type* get(FieldDataDescriptor<_T,_Id>) const
+	template<size_t index>
+	inline typename std::tuple_element<index,std::tuple<FieldDescriptors...> >::type::value_type * get( cst::at<index> ) const
 	{
-		using ValueType = typename FieldDataDescriptor<_T,_Id>::value_type;
-		static constexpr size_t index = FindFieldIndex<_Id,FieldDescriptors...>::index;
-		uint8_t* aptr = static_cast<uint8_t*>( m_aligned_ptr );
+		using ValueType = typename std::tuple_element<index,std::tuple<FieldDescriptors...> >::type::value_type ;
+		uint8_t* aptr = static_cast<uint8_t*>( m_storage_ptr );
 		ValueType* typed_pointer = reinterpret_cast<ValueType*>( aptr + PackedFieldArraysHelper<Alignment,index,FieldDescriptors...>::field_offset(capacity()) );
 		return typed_pointer;
+	}
+
+	template<typename _T,int _Id>
+	inline typename FieldDataDescriptor<_T,_Id>::value_type* get( FieldDataDescriptor<_T,_Id> ) const
+	{
+		static constexpr size_t index = FindFieldIndex<_Id,FieldDescriptors...>::index;
+		return get( cst::at<index>() );
 	}
 
 	inline void adjustCapacity()
@@ -63,14 +72,14 @@ struct PackedFieldArrays
 
 	inline void resize(size_t s)
 	{
-		if( s > m_capacity || ( s <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
+		if( s > m_capacity || s <= (m_capacity-ChunkSize) || s==0 )
 		{
 			adjustCapacity( s );
 		}
 		m_size = s;
 	}
 
-	inline void* data() const { return m_aligned_ptr; }
+	inline void* data() const { return m_storage_ptr; }
 	inline size_t size() const { return m_size; }
 	inline size_t capacity() const { return m_capacity; }
 
@@ -81,39 +90,54 @@ struct PackedFieldArrays
 
 private:
 
-	static inline size_t unaligned_allocation_size(size_t capacity)
+	static inline size_t allocation_size(size_t capacity)
 	{
 		using ElementType = typename std::decay< decltype( std::get<TupleSize-1>( std::tuple<FieldDescriptors...>() )  ) >::type;
 		return PackedFieldArraysHelper<Alignment,TupleSize-1,FieldDescriptors...>::field_offset(capacity) + capacity * sizeof(ElementType);
 	}
 
-	static inline size_t aligned_allocation_size(size_t capacity)
-	{
-		size_t alloc_size = unaligned_allocation_size( capacity );
-		return ( alloc_size + AlignmentLowMask ) & AlignmentHighMask;
-	}
-
 	inline void adjustCapacity(size_t s)
 	{
-		reallocate( ( ( s + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
+		size_t newCapacity = ( ( s + ChunkSize - 1 ) / ChunkSize ) * ChunkSize ;
+		if( newCapacity != m_capacity ) { reallocate( newCapacity ); }
 	}
 
 	inline void reallocate(size_t s)
 	{
 		assert( ( s % ChunkSize ) == 0 );
-		size_t needed_space = unaligned_allocation_size( s );
-		size_t total_space = aligned_allocation_size( s );
-		m_storage_ptr = realloc( m_storage_ptr , total_space );
-		size_t aligned_addr = reinterpret_cast<size_t>( m_storage_ptr );
-		aligned_addr = ( aligned_addr + AlignmentLowMask ) & AlignmentHighMask;
-		m_aligned_ptr = reinterpret_cast<void*>( aligned_addr );
+
+		size_t total_space = allocation_size( s );
+		assert( ( s==0 && total_space==0 ) || ( s!=0 && total_space!=0 ) );
+
+		void * new_ptr = nullptr;
+		if( total_space > 0 )
+		{
+			// here, we use posix_memalign (and not realloc) to benefit from aligned memory allocation provided by system library
+			size_t a = std::max( alignment() , sizeof(void*) ); // this is required by posix_memalign.
+			int r = posix_memalign( &new_ptr, a, total_space );
+			assert( r == 0 );
+		}
+
+		size_t cs = std::min(s,m_size);
+		assert( ( m_storage_ptr!=nullptr && new_ptr!=nullptr ) || ( cs == 0 ) );
+		
+		// copy here
+		PackedFieldArrays tmp;
+		tmp.m_storage_ptr = new_ptr;
+		tmp.m_size = cs;
+		tmp.m_capacity = s;
+		soatl::copy( tmp, *this, 0, cs, FieldDescriptors()... );
+		tmp.m_storage_ptr = nullptr;
+		tmp.m_size = 0;
+		tmp.m_capacity = 0;
+
+		if( m_storage_ptr!=nullptr ) { free(m_storage_ptr); }
+		m_storage_ptr = new_ptr;
 		m_capacity = s;
-		assert( m_aligned_ptr!=nullptr || m_capacity==0 );
+		assert( m_storage_ptr!=nullptr || m_capacity==0 );
 	}
 
-	void* m_aligned_ptr = nullptr; // start of data (real pointer to use, aligned)
 	void* m_storage_ptr = nullptr; // start of allocation (only usefull for deletion)
-
 	size_t m_size = 0;	
 	size_t m_capacity = 0;
 };
