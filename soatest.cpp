@@ -174,7 +174,7 @@ static inline void test_field_arrays_aliasing()
 
 int main(int argc, char* argv[])
 {
-/*
+
 	test_packed_field_arrays_aliasing<1,1>();
 	test_packed_field_arrays_aliasing<1,2>();
 	test_packed_field_arrays_aliasing<1,3>();
@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
 	test_packed_field_arrays_aliasing<64,3>();
 	test_packed_field_arrays_aliasing<64,6>();
 	test_packed_field_arrays_aliasing<64,16>();
-*/
+
 	test_field_arrays_aliasing<1,1>();
 	test_field_arrays_aliasing<1,2>();
 	test_field_arrays_aliasing<1,3>();

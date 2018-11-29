@@ -83,36 +83,24 @@ private:
 		using ValueType = typename std::decay< decltype( * std::get<N-1>( m_field_arrays ) ) >::type;
 		ValueType * old_ptr = std::get<N-1>( m_field_arrays );
 		ValueType * new_ptr = nullptr;
-		if( s > 0 ) { new_ptr = new ValueType[s]; }
-		if( old_ptr!=nullptr && new_ptr!=nullptr )
+		if( s > 0 )
 		{
-			size_t cs = std::min(s,m_size);
-			for(size_t i=0;i<cs;i++) { new_ptr[i] = old_ptr[i]; }
-		}
-		std::get<N-1>( m_field_arrays ) = new_ptr;
-		if( old_ptr != nullptr ) { delete [] old_ptr; }
-
-//		ValueType * old_ptr = std::get<N-1>( m_field_arrays );
-//		ValueType * new_ptr = nullptr;
-/*		if( s > 0 )
-		{
-			void* memptr = nullptr;
+			// here, we use posix_memalign (and not realloc) to benefit from aligned memory allocation provided by system library
 			size_t a = std::max( alignment() , sizeof(void*) ); // this is required by posix_memalign.
-			int r = posix_memalign( &memptr, a, s );
+			void* memptr = nullptr;
+			int r = posix_memalign( &memptr, a, s*sizeof(ValueType) );
 			assert( r == 0 );
 			new_ptr = reinterpret_cast<ValueType*>( memptr );
 		}
 		if( old_ptr!=nullptr && new_ptr!=nullptr )
 		{
-			size_t cs = m_size;
-			if( s < cs ) { cs = s; }
+			// we don't use realloc, so we have to copy elements
+			size_t cs = std::min(s,m_size);
 			for(size_t i=0;i<cs;i++) { new_ptr[i] = old_ptr[i]; }
 		}
-		if( old_ptr!=nullptr ) { delete [] old_ptr; }
 		std::get<N-1>( m_field_arrays ) = new_ptr;
-*/
-		reallocate_pointer( std::integral_constant<size_t,N-1>() , s );
-
+		if( old_ptr != nullptr ) { free(old_ptr); }
+		reallocate_pointer( std::integral_constant<size_t,N-1>() , s ); // recursion to next array
 	}
 	inline void reallocate_pointer( std::integral_constant<size_t,0> , size_t s ) {}
 
