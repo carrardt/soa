@@ -2,30 +2,27 @@
 
 #include <cstdlib> // for size_t
 
-template<typename _T,int _Id>
-struct FieldDataDescriptor
+namespace soatl
 {
-	using value_type = _T;
-	static constexpr int FieldId = _Id;
 
-	inline FieldDataDescriptor() {}
-	inline FieldDataDescriptor(const std::string& n) : m_name(n) {}
-	inline const std::string& name() const { return m_name; }
+template<size_t _id> struct FieldId { static constexpr size_t id =_id; };
+template<size_t _index> struct FieldIndex { static constexpr size_t index = _index; };
+template<size_t _id> struct FieldDescriptor { };
 
-private:
-	const std::string m_name;
-};
+template<size_t k, size_t... ids> struct find_index_of_id {};
+template<size_t k, size_t f, size_t... ids>
+struct find_index_of_id<k,f,ids...> { static constexpr size_t index = (k==f) ? 0 : (1+find_index_of_id<k,ids...>::index) ; };
+template<size_t k>
+struct find_index_of_id<k> { static constexpr size_t index = 0; };
 
+}
 
-// helper to get tuple index from field Id
-template<bool found, int _Index, int _Id, typename... FDS >
-struct FieldIdx {};
-template<int _Index, int _Id, typename... FDS> 
-struct FieldIdx<true,_Index,_Id,FDS...> { static constexpr int index = _Index; };
-template<int _Index, int _Id, typename FD, typename... FDS> 
-struct FieldIdx<false,_Index,_Id,FD,FDS...> { static constexpr int index = FieldIdx<_Id==FD::FieldId,_Index+1,_Id,FDS...>::index; };
-template<int _Index, int _Id>
-struct FieldIdx<false,_Index,_Id> { static constexpr int index = -1; };
-template<int _Id, typename FD, typename... FDS>
-struct FindFieldIndex { static constexpr int index = FieldIdx<false,-1,_Id,FD,FDS...>::index; };
+#define SOATL_DECLARE_FIELD(id,type,name) \
+static soatl::FieldId<id> name; \
+namespace soatl { \
+template<> struct FieldDescriptor<id> { \
+	using value_type = type; \
+	static constexpr size_t Id=id; \
+	static const char* name() { return #name ; } \
+}; }
 

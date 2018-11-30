@@ -31,6 +31,8 @@ namespace soatl
 	template<typename DstArrays, typename SrcArrays, typename... FDS>
 	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const FDS&... )
 	{
+		assert( (start+count) <= dst.size() );
+		assert( (start+count) <= src.size() );
 		FieldArraysCopyHelper<DstArrays,SrcArrays,FDS...>::copy(dst,src,start,count);
 	}
 

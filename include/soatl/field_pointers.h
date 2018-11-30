@@ -9,31 +9,31 @@
 namespace soatl {
 
 // this class hould be private, i.e. not instantiated by user but only through specific operations
-template<size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
+template<size_t _Alignment, size_t _ChunkSize, size_t... FieldIds>
 struct FieldPointers
 {
 	static constexpr size_t ChunkSize = _ChunkSize;
 	static constexpr size_t Alignment = _Alignment;
-	static constexpr size_t TupleSize = sizeof...(FieldDescriptors) ;
+	static constexpr size_t TupleSize = sizeof...(FieldIds) ;
 
-	using ArrayTuple = std::tuple< typename FieldDescriptors::value_type* ... > ;
+	using ArrayTuple = std::tuple< typename FieldDescriptor<FieldIds>::value_type* ... > ;
 
 	inline FieldPointers(size_t s) : m_size(s)
 	{
 		init( std::integral_constant<size_t,TupleSize>() );
 	}
 
-	template<typename _T,int _Id>
-	inline typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>)
+	template<size_t _id>
+	inline typename FieldDescriptor<_id>::value_type* & get( FieldId<_id> )
 	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
+		static constexpr int index = find_index_of_id<_id,FieldIds...>::index;
 		return std::get<index>(m_field_arrays);
 	}
 
-	template<typename _T,int _Id>
-	inline const typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>) const
+	template<size_t _id>
+	inline typename FieldDescriptor<_id>::value_type* get( FieldId<_id> ) const
 	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
+		static constexpr int index = find_index_of_id<_id,FieldIds...>::index;
 		return std::get<index>(m_field_arrays);
 	}
 
@@ -57,12 +57,12 @@ private:
 	size_t m_size = 0;
 };
 
-template<size_t A, size_t C, typename... FieldDescriptors>
+template<size_t A, size_t C, size_t... ids>
 static inline 
-FieldPointers<A,C,FieldDescriptors...>
-make_field_pointers( size_t N, cst::align<A>, cst::chunk<C>, const FieldDescriptors& ... )
+FieldPointers<A,C,ids...>
+make_field_pointers( size_t N, cst::align<A>, cst::chunk<C>, const FieldId<ids>& ... )
 {
-	return FieldPointers<A,C,FieldDescriptors...>( N );
+	return FieldPointers<A,C,ids...>( N );
 }
 
 

@@ -17,7 +17,7 @@ be a power of two and a multiple of sizeof(void *).  If size is 0, then the valu
 namespace soatl {
 
 // TODO: add alignment
-template<size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
+template<size_t _Alignment, size_t _ChunkSize, size_t... ids>
 struct FieldArrays
 {
         static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
@@ -25,25 +25,18 @@ struct FieldArrays
         static constexpr size_t AlignmentLowMask = Alignment - 1;
         static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
-	static constexpr size_t TupleSize = sizeof...(FieldDescriptors);
-	using ArrayTuple = std::tuple< typename FieldDescriptors::value_type* ... > ;
+	static constexpr size_t TupleSize = sizeof...(ids);
+	using ArrayTuple = std::tuple< typename FieldDescriptor<ids>::value_type* ... > ;
 
 	inline FieldArrays()
 	{
 		init( std::integral_constant<size_t,TupleSize>() );
 	}
 
-	template<typename _T,int _Id>
-	inline typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>)
+	template<size_t _id>
+	inline typename FieldDescriptor<_id>::value_type* get( FieldId<_id> ) const
 	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
-		return std::get<index>(m_field_arrays);
-	}
-
-	template<typename _T,int _Id>
-	inline const typename FieldDataDescriptor<_T,_Id>::value_type * get(FieldDataDescriptor<_T,_Id>) const
-	{
-		static constexpr int index = FindFieldIndex<_Id,FieldDescriptors...>::index;
+		static constexpr int index = find_index_of_id<_id,ids...>::index;
 		return std::get<index>(m_field_arrays);
 	}
 
@@ -117,18 +110,18 @@ private:
 	size_t m_capacity = 0;
 };
 
-template<typename... FieldDescriptors>
+template<size_t... ids>
 inline
-FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...> make_field_arrays(FieldDescriptors...)
+FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...> make_field_arrays(const FieldId<ids>& ...)
 {
-	return FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
+	return FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>();
 }
 
-template<size_t A, size_t C,typename... FieldDescriptors>
+template<size_t A, size_t C,size_t... ids>
 inline
-FieldArrays<A,C,FieldDescriptors...> make_field_arrays(cst::align<A>, cst::chunk<C>, FieldDescriptors...)
+FieldArrays<A,C,ids...> make_field_arrays(cst::align<A>, cst::chunk<C>, const FieldId<ids>& ...)
 {
-	return FieldArrays<A,C,FieldDescriptors...>();
+	return FieldArrays<A,C,ids...>();
 }
 
 } // namespace soatl

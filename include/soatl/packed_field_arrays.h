@@ -12,7 +12,7 @@
 
 namespace soatl {
 
-template<size_t A, size_t TI, typename... FieldDescriptors>
+template<size_t A, size_t TI, size_t... ids>
 struct PackedFieldArraysHelper
 {
 	static constexpr size_t Alignment = A;
@@ -21,20 +21,20 @@ struct PackedFieldArraysHelper
 
 	static inline size_t field_offset( size_t capacity )
 	{
-		using ElementType = typename std::decay< decltype( std::get<TI-1>( std::tuple<FieldDescriptors...>() )  ) >::type;
-		size_t offset = PackedFieldArraysHelper<Alignment,TI-1,FieldDescriptors...>::field_offset( capacity );
+		using ElementType = typename std::tuple_element< TI-1 , std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
+		size_t offset = PackedFieldArraysHelper<Alignment,TI-1,ids...>::field_offset( capacity );
 		offset += ( ( capacity * sizeof(ElementType) ) + AlignmentLowMask ) & AlignmentHighMask;
 		return offset;
 	}
 };
 
-template<size_t A,typename... FieldDescriptors>
-struct PackedFieldArraysHelper<A,0,FieldDescriptors...>
+template<size_t A, size_t... ids>
+struct PackedFieldArraysHelper<A,0,ids...>
 {
 	static inline constexpr size_t field_offset(size_t) { return 0; }
 };
 
-template< size_t _Alignment, size_t _ChunkSize, typename... FieldDescriptors>
+template< size_t _Alignment, size_t _ChunkSize, size_t... ids>
 struct PackedFieldArrays
 {
 	static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
@@ -42,26 +42,24 @@ struct PackedFieldArrays
 	static constexpr size_t AlignmentLowMask = Alignment - 1;
 	static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
-	static constexpr int TupleSize = sizeof...(FieldDescriptors);
-
-	using FieldDescriptorTuple = std::tuple<FieldDescriptors...> ;
+	static constexpr int TupleSize = sizeof...(ids);
 
 	static constexpr size_t alignment() { return Alignment; }
 	static constexpr size_t chunksize() { return ChunkSize; }
 
 	template<size_t index>
-	inline typename std::tuple_element<index,std::tuple<FieldDescriptors...> >::type::value_type * get( cst::at<index> ) const
+	inline typename std::tuple_element<index,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type * get( cst::at<index> ) const
 	{
-		using ValueType = typename std::tuple_element<index,std::tuple<FieldDescriptors...> >::type::value_type ;
+		using ValueType = typename std::tuple_element<index, std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
 		uint8_t* aptr = static_cast<uint8_t*>( m_storage_ptr );
-		ValueType* typed_pointer = reinterpret_cast<ValueType*>( aptr + PackedFieldArraysHelper<Alignment,index,FieldDescriptors...>::field_offset(capacity()) );
+		ValueType* typed_pointer = reinterpret_cast<ValueType*>( aptr + PackedFieldArraysHelper<Alignment,index,ids...>::field_offset(capacity()) );
 		return typed_pointer;
 	}
 
-	template<typename _T,int _Id>
-	inline typename FieldDataDescriptor<_T,_Id>::value_type* get( FieldDataDescriptor<_T,_Id> ) const
+	template<size_t _id>
+	inline typename FieldDescriptor<_id>::value_type * get( FieldId<_id> ) const
 	{
-		static constexpr size_t index = FindFieldIndex<_Id,FieldDescriptors...>::index;
+		static constexpr size_t index = find_index_of_id<_id,ids...>::index;
 		return get( cst::at<index>() );
 	}
 
@@ -92,8 +90,8 @@ private:
 
 	static inline size_t allocation_size(size_t capacity)
 	{
-		using ElementType = typename std::decay< decltype( std::get<TupleSize-1>( std::tuple<FieldDescriptors...>() )  ) >::type;
-		return PackedFieldArraysHelper<Alignment,TupleSize-1,FieldDescriptors...>::field_offset(capacity) + capacity * sizeof(ElementType);
+		using ValueType = typename std::tuple_element<TupleSize-1,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
+		return PackedFieldArraysHelper<Alignment,TupleSize-1,ids...>::field_offset(capacity) + capacity * sizeof(ValueType);
 	}
 
 	inline void adjustCapacity(size_t s)
@@ -126,7 +124,7 @@ private:
 		tmp.m_storage_ptr = new_ptr;
 		tmp.m_size = cs;
 		tmp.m_capacity = s;
-		soatl::copy( tmp, *this, 0, cs, FieldDescriptors()... );
+		soatl::copy( tmp, *this, 0, cs, FieldId<ids>()... );
 		tmp.m_storage_ptr = nullptr;
 		tmp.m_size = 0;
 		tmp.m_capacity = 0;
@@ -142,20 +140,20 @@ private:
 	size_t m_capacity = 0;
 };
 
-template<typename... FieldDescriptors>
+template<size_t... ids>
 inline
-PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...>
-make_packed_field_arrays(const FieldDescriptors&... fdt)
+PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>
+make_packed_field_arrays(const FieldId<ids>& ...)
 {
-	return PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,FieldDescriptors...>();
+	return PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>();
 }
 
-template<size_t A, size_t C, typename... FieldDescriptors>
+template<size_t A, size_t C, size_t... ids>
 inline
-PackedFieldArrays<A,C,FieldDescriptors...>
-make_packed_field_arrays( cst::align<A>, cst::chunk<C>, const FieldDescriptors&... fdt)
+PackedFieldArrays<A,C,ids...>
+make_packed_field_arrays( cst::align<A>, cst::chunk<C>, const FieldId<ids>& ...)
 {
-	return PackedFieldArrays<A,C,FieldDescriptors...>();
+	return PackedFieldArrays<A,C,ids...>();
 }
 
 

@@ -20,15 +20,24 @@ enum ParticleField
 	PARTICLE_E,
 	PARTICLE_ATOM_TYPE,
 	PARITCLE_MOLECULE_ID,
-
 	PARTICLE_PAIR_DIST,
-
 	PARTICLE_TMP1,
 	PARTICLE_TMP2,
 	PARTICLE_TMP3,
 
 	PARTICLE_FIELD_COUNT
 };
+
+SOATL_DECLARE_FIELD(PARTICLE_RX,double,particle_rx)
+SOATL_DECLARE_FIELD(PARTICLE_RY,double,particle_ry)
+SOATL_DECLARE_FIELD(PARTICLE_RZ,double,particle_rz)
+SOATL_DECLARE_FIELD(PARTICLE_ATOM_TYPE,unsigned char,particle_atype)
+SOATL_DECLARE_FIELD(PARTICLE_E,double,particle_e)
+SOATL_DECLARE_FIELD(PARITCLE_MOLECULE_ID,int32_t,particle_mid)
+SOATL_DECLARE_FIELD(PARTICLE_PAIR_DIST,float,particle_dist)
+SOATL_DECLARE_FIELD(PARTICLE_TMP1,int16_t,particle_tmp1)
+SOATL_DECLARE_FIELD(PARTICLE_TMP2,int8_t,particle_tmp2)
+
 
 static inline void compute_distance( double& dist, double x, double y, double z, double x2, double y2, double z2 )
 {
@@ -49,20 +58,9 @@ static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP 
 	}
 }
 
-template<typename OperatorT, size_t A, size_t C, typename... FieldDescriptors >
-static inline void apply_to_field_arrays( OperatorT f, size_t first, size_t N, const soatl::FieldArrays<A,C,FieldDescriptors...>& field_arrays)
-{
-	size_t last = first+N;
-	#pragma omp simd
-	for(size_t i=first;i<last;i++)
-	{
-		f( field_arrays.get(FieldDescriptors())[i] ... );
-	}
-}
-
 // WARNING: assumes that elements in arrays support 'operator = (const size_t&)' and 'operator == (const size_t&)'
-template<typename FieldsT, typename... FieldDescriptors>
-static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const FieldDescriptors & ... fd )
+template<typename FieldsT, size_t... _ids>
+static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const soatl::FieldId<_ids>& ... fids )
 {
 	std::uniform_int_distribution<> rndist(0,N*2);
 	std::cout<<"check_field_arrays_aliasing: align="<<field_arrays.alignment()<<", chunksize="<<field_arrays.chunksize()<<std::endl;
@@ -76,7 +74,7 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 			void* ptr;
 			size_t addr;
 			TEMPLATE_LIST_BEGIN
-				ptr = field_arrays.get( FieldDescriptors() ) ,
+				ptr = field_arrays.get( fids ) ,
 				addr = reinterpret_cast<size_t>(ptr) ,
 				assert( ( addr % alignment ) == 0 ) 
 			TEMPLATE_LIST_END
@@ -87,7 +85,7 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 		for(size_t i=0;i<j;i++)
                 {
 			TEMPLATE_LIST_BEGIN
-				field_arrays.get( FieldDescriptors() )[i] = static_cast<typename FieldDescriptors::value_type>( k ) ,
+				field_arrays.get( fids )[i] = static_cast<typename soatl::FieldDescriptor<_ids>::value_type>( k ) ,
 				++k
 			TEMPLATE_LIST_END
 		}
@@ -97,7 +95,7 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 			bool value_ok = false;
 			size_t findex = 0;
 			TEMPLATE_LIST_BEGIN
-				value_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				value_ok = field_arrays.get( fids )[i] == static_cast<typename soatl::FieldDescriptor<_ids>::value_type>( k ) ,
 				//std::cout<<"value["<<findex<<"]="<< (size_t)(field_arrays.get( FieldDescriptors() )[i] )<<std::endl ,
 				assert(value_ok) ,
 				++ findex ,
@@ -116,7 +114,7 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 			bool value_ok = false;
 			size_t findex = 0;
 			TEMPLATE_LIST_BEGIN
-				value_ok = field_arrays.get( FieldDescriptors() )[i] == static_cast<typename FieldDescriptors::value_type>( k ) ,
+				value_ok = field_arrays.get( fids )[i] == static_cast<typename soatl::FieldDescriptor<_ids>::value_type>( k ) ,
 				//std::cout<<"value["<<findex<<"]="<< (size_t)( field_arrays.get( FieldDescriptors() )[i] )<<std::endl ,
 				assert(value_ok) ,
 				++ findex ,
@@ -132,7 +130,7 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 		void* ptr;
 		size_t findex = 0;
 		TEMPLATE_LIST_BEGIN
-			ptr = field_arrays.get( FieldDescriptors() ) ,
+			ptr = field_arrays.get( fids ) ,
 			//std::cout<<"ptr["<<findex<<"]="<<ptr<<std::endl ,
 			++findex , 
 			assert(ptr==nullptr) 
@@ -145,15 +143,15 @@ static inline void test_packed_field_arrays_aliasing()
 {
 	std::cout<<"test_pack_field_arrays_aliasing<"<<A<<","<<C<<">"<<std::endl;
 
-	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
-	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
-	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
-	FieldDataDescriptor<float,PARTICLE_E> e("e");
-	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
-	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
-	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
-	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
-	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
+	auto rx = particle_rx;
+	auto ry = particle_ry;
+	auto rz = particle_rz;
+	auto e = particle_e;
+	auto atype = particle_atype;
+	auto mid = particle_mid;
+	auto tmp1 = particle_tmp1;
+	auto tmp2 = particle_tmp2;
+	auto dist = particle_dist;
 
 	{
 		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
@@ -183,15 +181,15 @@ static inline void test_field_arrays_aliasing()
 {
 	std::cout<<"test_field_arrays_aliasing<"<<C<<">"<<std::endl;	
 
-	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
-	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
-	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
-	FieldDataDescriptor<float,PARTICLE_E> e("e");
-	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
-	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
-	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
-	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
-	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
+	auto rx = particle_rx;
+	auto ry = particle_ry;
+	auto rz = particle_rz;
+	auto e = particle_e;
+	auto atype = particle_atype;
+	auto mid = particle_mid;
+	auto tmp1 = particle_tmp1;
+	auto tmp2 = particle_tmp2;
+	auto dist = particle_dist;
 
 	{
 		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
@@ -263,15 +261,15 @@ int main(int argc, char* argv[])
 	test_field_arrays_aliasing<64,6>();
 	test_field_arrays_aliasing<64,16>();
 
-	FieldDataDescriptor<double,PARTICLE_RX> rx("rx");
-	FieldDataDescriptor<double,PARTICLE_RY> ry("ry");
-	FieldDataDescriptor<double,PARTICLE_RZ> rz("rz");
-	FieldDataDescriptor<float,PARTICLE_E> e("e");
-	FieldDataDescriptor<unsigned char,PARTICLE_ATOM_TYPE> atype("type");
-	FieldDataDescriptor<int32_t,PARITCLE_MOLECULE_ID> mid("molecule");
-	FieldDataDescriptor<float,PARTICLE_PAIR_DIST> dist("distance");
-	FieldDataDescriptor<int16_t,PARTICLE_TMP1> tmp1("temporary 1");
-	FieldDataDescriptor<int8_t,PARTICLE_TMP2> tmp2("temporary 2");
+	auto rx = particle_rx;
+	auto ry = particle_ry;
+	auto rz = particle_rz;
+	auto e = particle_e;
+	auto atype = particle_atype;
+	auto mid = particle_mid;
+	auto tmp1 = particle_tmp1;
+	auto tmp2 = particle_tmp2;
+	auto dist = particle_dist;
 
 	auto cell_arrays1 = soatl::make_field_arrays( rx,ry,rz,e,dist );
 	auto cell_arrays2 = soatl::make_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), atype,rx,mid,ry,rz );
@@ -321,8 +319,21 @@ int main(int argc, char* argv[])
 		std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl;
 	}
 
-	auto zip = soatl::make_field_pointers( N, soatl::cst::align<64>(), soatl::cst::chunk<8>(), atype,rx,mid,ry,rz );
 
+	auto zip = soatl::make_field_pointers( N, soatl::cst::align<64>(), soatl::cst::chunk<8>(), rx, ry, rz, dist );
+
+	zip.get(rx) = cell_arrays2.get(rx);
+	zip.get(ry) = cell_arrays2.get(ry);
+	zip.get(rz) = cell_arrays2.get(rz);
+	zip.get(dist) = cell_arrays1.get(dist);
+
+	soatl::copy( zip , cell_arrays1 , 0, N, rx, ry, rz );
+
+	double ax = rx2_ptr[0];
+	double ay = ry2_ptr[0];
+	double az = rz2_ptr[0];
+
+	//apply_to_arrays( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
 }
 
 
