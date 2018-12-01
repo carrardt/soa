@@ -7,7 +7,7 @@ namespace soatl
 
 template<size_t _id> struct FieldId { static constexpr size_t id =_id; };
 template<size_t _index> struct FieldIndex { static constexpr size_t index = _index; };
-template<size_t _id> struct FieldDescriptor { };
+template<size_t _id> struct FieldDescriptor {};
 
 template<size_t k, size_t... ids> struct find_index_of_id {};
 template<size_t k, size_t f, size_t... ids>
@@ -17,12 +17,4 @@ struct find_index_of_id<k> { static constexpr size_t index = 0; };
 
 }
 
-#define SOATL_DECLARE_FIELD(id,type,name) \
-static soatl::FieldId<id> name; \
-namespace soatl { \
-template<> struct FieldDescriptor<id> { \
-	using value_type = type; \
-	static constexpr size_t Id=id; \
-	static const char* name() { return #name ; } \
-}; }
 

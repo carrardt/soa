@@ -10,34 +10,9 @@
 #include "soatl/variadic_template_utils.h"
 #include "soatl/field_pointers.h"
 
+#include "declare_fields.h"
+
 std::default_random_engine rng;
-
-enum ParticleField
-{
-	PARTICLE_RX,
-	PARTICLE_RY,
-	PARTICLE_RZ,
-	PARTICLE_E,
-	PARTICLE_ATOM_TYPE,
-	PARITCLE_MOLECULE_ID,
-	PARTICLE_PAIR_DIST,
-	PARTICLE_TMP1,
-	PARTICLE_TMP2,
-	PARTICLE_TMP3,
-
-	PARTICLE_FIELD_COUNT
-};
-
-SOATL_DECLARE_FIELD(PARTICLE_RX,double,particle_rx)
-SOATL_DECLARE_FIELD(PARTICLE_RY,double,particle_ry)
-SOATL_DECLARE_FIELD(PARTICLE_RZ,double,particle_rz)
-SOATL_DECLARE_FIELD(PARTICLE_ATOM_TYPE,unsigned char,particle_atype)
-SOATL_DECLARE_FIELD(PARTICLE_E,double,particle_e)
-SOATL_DECLARE_FIELD(PARITCLE_MOLECULE_ID,int32_t,particle_mid)
-SOATL_DECLARE_FIELD(PARTICLE_PAIR_DIST,float,particle_dist)
-SOATL_DECLARE_FIELD(PARTICLE_TMP1,int16_t,particle_tmp1)
-SOATL_DECLARE_FIELD(PARTICLE_TMP2,int8_t,particle_tmp2)
-
 
 static inline void compute_distance( double& dist, double x, double y, double z, double x2, double y2, double z2 )
 {
@@ -63,7 +38,14 @@ template<typename FieldsT, size_t... _ids>
 static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const soatl::FieldId<_ids>& ... fids )
 {
 	std::uniform_int_distribution<> rndist(0,N*2);
-	std::cout<<"check_field_arrays_aliasing: align="<<field_arrays.alignment()<<", chunksize="<<field_arrays.chunksize()<<std::endl;
+
+	/*
+	std::cout<<"check_field_arrays_aliasing: align="<<field_arrays.alignment()<<", chunksize="<<field_arrays.chunksize()<<", using fields :"<<std::endl;
+	TEMPLATE_LIST_BEGIN
+		std::cout<<"\t"<< soatl::FieldDescriptor<_ids>::name() <<std::endl
+	TEMPLATE_LIST_END
+	*/
+
         for(size_t j=1;j<=N;j++)
         {
                 field_arrays.resize(j);
@@ -80,8 +62,10 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 			TEMPLATE_LIST_END
 		}
 
-		//std::cout<<"check_field_arrays_aliasing: size="<<field_arrays.size()<<", capacity="<<field_arrays.capacity()<<std::endl;
-		size_t k=0;
+		// container 'c' must guarantee that acces beyond c.size() is valid up to the next chunk boundary
+		// container only guarantees that read or write access beyond c.size() (up to the next chunk) but values in this area are undefined
+		//std::cout<<"check_field_arrays_aliasing: size="<<field_arrays.size()<<", capacity="<<field_arrays.capacity()<<", chunk boundary="<<field_arrays.chunk_ceil()<<std::endl;
+		size_t k = 0;
 		for(size_t i=0;i<j;i++)
                 {
 			TEMPLATE_LIST_BEGIN
@@ -89,6 +73,16 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 				++k
 			TEMPLATE_LIST_END
 		}
+		// read from and write to the area beyond size() and up to next chunk boundary
+		for(size_t i=j;i<field_arrays.chunk_ceil();i++)
+                {
+			TEMPLATE_LIST_BEGIN
+				k += static_cast<size_t>( field_arrays.get( fids )[i] ) ,
+				field_arrays.get( fids )[i] = static_cast<typename soatl::FieldDescriptor<_ids>::value_type>( k ) 
+			TEMPLATE_LIST_END
+		}
+
+		// read back values in [0;size()[ to check values are still correct
 		k=0;
 		for(size_t i=0;i<j;i++)
                 {
@@ -155,6 +149,7 @@ static inline void test_packed_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063, field_arrays , atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
@@ -162,6 +157,7 @@ static inline void test_packed_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -169,6 +165,7 @@ static inline void test_packed_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_packed_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -193,6 +190,7 @@ static inline void test_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,rx,mid,ry,dist,rz,tmp1 );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,rz );
@@ -200,6 +198,7 @@ static inline void test_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), atype,mid,dist,tmp2,tmp1,rx,ry,rz );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063,field_arrays, atype,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,rz,atype,mid,tmp2,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -207,6 +206,7 @@ static inline void test_field_arrays_aliasing()
 
 	{
 		auto field_arrays = soatl::make_field_arrays( soatl::cst::align<A>(), soatl::cst::chunk<C>(), rx,ry,rz,atype,mid,dist,tmp2,tmp1 );
+		assert( field_arrays.alignment()==A && field_arrays.chunksize()==C );
 		check_field_arrays_aliasing(1063,field_arrays, atype,tmp2,rx,mid,ry,dist,rz,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, rx,ry,tmp2,rz,atype,mid,dist,tmp1 );
 		check_field_arrays_aliasing(1063,field_arrays, atype,mid,dist,tmp1,rx,ry,tmp2,rz );
@@ -333,7 +333,16 @@ int main(int argc, char* argv[])
 	double ay = ry2_ptr[0];
 	double az = rz2_ptr[0];
 
-	//apply_to_arrays( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
+	apply_to_arrays( [ax,ay,az](float& d, double x, double y, double z)
+			 {
+			     x -= ax;
+			     y -= ay;
+			     z -= az;
+			     d = std::sqrt(x*x+y*y+z*z);
+			 }
+			 , 0, N,
+			 zip.get(dist), zip.get(rx), zip.get(ry), zip.get(rz)
+			 );
 }
 
 

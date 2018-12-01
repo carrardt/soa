@@ -38,7 +38,8 @@ struct FieldPointers
 	}
 
 	inline size_t size() const { return m_size; }
-	inline size_t capacity() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
+	inline size_t chunk_ceil() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
+	inline size_t capacity() const { return chunk_ceil(); }
 
 	static inline constexpr size_t alignment() { return Alignment; }
 	static inline constexpr size_t chunksize() { return ChunkSize; }

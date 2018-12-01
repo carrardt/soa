@@ -55,9 +55,10 @@ struct FieldArrays
 	}
 
 	inline size_t size() const { return m_size; }
+	inline size_t chunk_ceil() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
 	inline size_t capacity() const { return m_capacity; }
 
-	static inline constexpr size_t alignment() { return 1; }
+	static inline constexpr size_t alignment() { return Alignment; }
 	static inline constexpr size_t chunksize() { return ChunkSize; }
 
 private:

@@ -80,6 +80,7 @@ struct PackedFieldArrays
 	inline void* data() const { return m_storage_ptr; }
 	inline size_t size() const { return m_size; }
 	inline size_t capacity() const { return m_capacity; }
+	inline size_t chunk_ceil() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
 
 	inline ~PackedFieldArrays()
 	{
