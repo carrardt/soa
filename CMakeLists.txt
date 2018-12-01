@@ -14,18 +14,28 @@ set(CMAKE_CXX_EXTENSIONS NO)
 
 find_package(OpenMP REQUIRED)
 
-# test binary 
-add_executable(soatest tests/soatest.cpp)
-target_include_directories(soatest PUBLIC include)
-target_compile_options(soatest PUBLIC ${OpenMP_CXX_FLAGS})
-target_link_libraries(soatest ${OpenMP_LIBRARIES})
+# base test : alignment, chunk boundaries, aliasing, resize, etc.
+add_executable(soatltest tests/soatest.cpp)
+target_include_directories(soatltest PUBLIC include)
+target_compile_options(soatltest PUBLIC ${OpenMP_CXX_FLAGS})
+target_link_libraries(soatltest ${OpenMP_LIBRARIES})
 
+add_executable(soatlcomputetest tests/computetest.cpp)
+target_include_directories(soatlcomputetest PUBLIC include)
+target_compile_options(soatlcomputetest PUBLIC ${OpenMP_CXX_FLAGS})
+target_link_libraries(soatlcomputetest ${OpenMP_LIBRARIES})
+
+# tests
 enable_testing()
-add_test(NAME soatl_test1 COMMAND soatest 1000 0)
-add_test(NAME soatl_test2 COMMAND soatest 1000 34523452)
-add_test(NAME soatl_test3 COMMAND soatest 1000 1976)
-add_test(NAME soatl_test4 COMMAND soatest 1000 234234234)
+add_test(NAME soatl_test1 COMMAND soatltest 1000 0)
+add_test(NAME soatl_test2 COMMAND soatltest 1000 34523452)
+add_test(NAME soatl_test3 COMMAND soatltest 1000 1976)
+add_test(NAME soatl_test4 COMMAND soatltest 1000 234234234)
+add_test(NAME soatl_compute1 COMMAND soatlcomputetest 1000 0)
+add_test(NAME soatl_compute2 COMMAND soatlcomputetest 1000 34523452)
+add_test(NAME soatl_compute3 COMMAND soatlcomputetest 1000 1976)
+add_test(NAME soatl_compute4 COMMAND soatlcomputetest 1000 234234234)
 
 # Install commands
-install(TARGETS soatest DESTINATION bin)
+install(DIRECTORY include/soatl DESTINATION include)
 
