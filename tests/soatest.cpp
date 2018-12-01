@@ -64,7 +64,13 @@ static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays,
 
 		// container 'c' must guarantee that acces beyond c.size() is valid up to the next chunk boundary
 		// container only guarantees that read or write access beyond c.size() (up to the next chunk) but values in this area are undefined
-		//std::cout<<"check_field_arrays_aliasing: size="<<field_arrays.size()<<", capacity="<<field_arrays.capacity()<<", chunk boundary="<<field_arrays.chunk_ceil()<<std::endl;
+#ifdef DEBUG
+		std::cout<<"check_field_arrays_aliasing: a="<<field_arrays.alignment()
+			 <<", c="<<field_arrays.chunksize()
+			 <<", size="<<field_arrays.size()
+			 <<", capacity="<<field_arrays.capacity()
+			 <<", chunk boundary="<<field_arrays.chunk_ceil()<<std::endl;
+#endif
 		size_t k = 0;
 		for(size_t i=0;i<j;i++)
                 {
@@ -216,7 +222,6 @@ static inline void test_field_arrays_aliasing()
 
 int main(int argc, char* argv[])
 {
-
 	int seed = 0;
 	size_t N = 10000;
 

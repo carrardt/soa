@@ -9,6 +9,7 @@
 #include "soatl/constants.h"
 #include "soatl/copy.h"
 #include "soatl/variadic_template_utils.h"
+#include "soatl/memory.h"
 
 namespace soatl {
 
@@ -44,6 +45,8 @@ struct PackedFieldArrays
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr int TupleSize = sizeof...(ids);
 
+	using AllocStrategy = DefaultAllocationStrategy;
+
 	static constexpr size_t alignment() { return Alignment; }
 	static constexpr size_t chunksize() { return ChunkSize; }
 
@@ -63,18 +66,18 @@ struct PackedFieldArrays
 		return get( cst::at<index>() );
 	}
 
-	inline void adjustCapacity()
-	{
-		adjustCapacity( size() );
-	}
-
+	// resize container
 	inline void resize(size_t s)
 	{
-		if( s > m_capacity || s <= (m_capacity-ChunkSize) || s==0 )
+		if( s != m_size )
 		{
-			adjustCapacity( s );
+			size_t new_capacity = AllocStrategy::update_capacity(s,capacity(),chunksize());
+			if( new_capacity != m_capacity )
+			{
+				reallocate( new_capacity );
+			}
+			m_size = s;
 		}
-		m_size = s;
 	}
 
 	inline void* data() const { return m_storage_ptr; }
@@ -93,12 +96,6 @@ private:
 	{
 		using ValueType = typename std::tuple_element<TupleSize-1,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
 		return PackedFieldArraysHelper<Alignment,TupleSize-1,ids...>::field_offset(capacity) + capacity * sizeof(ValueType);
-	}
-
-	inline void adjustCapacity(size_t s)
-	{
-		size_t newCapacity = ( ( s + ChunkSize - 1 ) / ChunkSize ) * ChunkSize ;
-		if( newCapacity != m_capacity ) { reallocate( newCapacity ); }
 	}
 
 	inline void reallocate(size_t s)

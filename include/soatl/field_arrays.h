@@ -8,6 +8,7 @@
 
 #include "soatl/field_descriptor.h"
 #include "soatl/constants.h"
+#include "soatl/memory.h"
 
 /*
 The  function posix_memalign() allocates size bytes and places the address of the allocated memory in *memptr.  The address of the allocated memory will be a multiple of alignment, which must
@@ -17,7 +18,7 @@ be a power of two and a multiple of sizeof(void *).  If size is 0, then the valu
 namespace soatl {
 
 // TODO: add alignment
-template<size_t _Alignment, size_t _ChunkSize, size_t... ids>
+template<size_t _Alignment, size_t _ChunkSize, size_t... ids >
 struct FieldArrays
 {
         static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
@@ -26,7 +27,9 @@ struct FieldArrays
         static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr size_t TupleSize = sizeof...(ids);
+
 	using ArrayTuple = std::tuple< typename FieldDescriptor<ids>::value_type* ... > ;
+	using AllocStrategy = DefaultAllocationStrategy;
 
 	inline FieldArrays()
 	{
@@ -40,18 +43,17 @@ struct FieldArrays
 		return std::get<index>(m_field_arrays);
 	}
 
-	inline void adjustCapacity(size_t s)
-	{
-		reallocate( ( ( s + ChunkSize - 1 ) / ChunkSize ) * ChunkSize );
-	}
-
 	inline void resize(size_t s)
 	{
-		if( s > m_capacity || ( s <= (m_capacity/2) && m_capacity >= 2*ChunkSize ) )
+		if( s != m_size )
 		{
-			adjustCapacity( s );
+			size_t new_capacity = AllocStrategy::update_capacity(s,capacity(),chunksize());
+			if( new_capacity != m_capacity )
+			{
+				reallocate( new_capacity );
+			}
+			m_size = s;
 		}
-		m_size = s;
 	}
 
 	inline size_t size() const { return m_size; }
