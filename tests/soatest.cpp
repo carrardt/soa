@@ -222,11 +222,35 @@ int main(int argc, char* argv[])
 	test_packed_field_arrays_aliasing<1,6>();
 	test_packed_field_arrays_aliasing<1,16>();
 
+	test_packed_field_arrays_aliasing<2,1>();
+	test_packed_field_arrays_aliasing<2,2>();
+	test_packed_field_arrays_aliasing<2,3>();
+	test_packed_field_arrays_aliasing<2,6>();
+	test_packed_field_arrays_aliasing<2,16>();
+
+	test_packed_field_arrays_aliasing<4,1>();
+	test_packed_field_arrays_aliasing<4,2>();
+	test_packed_field_arrays_aliasing<4,3>();
+	test_packed_field_arrays_aliasing<4,6>();
+	test_packed_field_arrays_aliasing<4,16>();
+
+	test_packed_field_arrays_aliasing<8,1>();
+	test_packed_field_arrays_aliasing<8,2>();
+	test_packed_field_arrays_aliasing<8,3>();
+	test_packed_field_arrays_aliasing<8,6>();
+	test_packed_field_arrays_aliasing<8,16>();
+
 	test_packed_field_arrays_aliasing<16,1>();
 	test_packed_field_arrays_aliasing<16,2>();
 	test_packed_field_arrays_aliasing<16,3>();
 	test_packed_field_arrays_aliasing<16,6>();
 	test_packed_field_arrays_aliasing<16,16>();
+
+	test_packed_field_arrays_aliasing<32,1>();
+	test_packed_field_arrays_aliasing<32,2>();
+	test_packed_field_arrays_aliasing<32,3>();
+	test_packed_field_arrays_aliasing<32,6>();
+	test_packed_field_arrays_aliasing<32,16>();
 
 	test_packed_field_arrays_aliasing<64,1>();
 	test_packed_field_arrays_aliasing<64,2>();
