@@ -37,7 +37,7 @@ struct FieldArrays
 	}
 
 	template<size_t _id>
-	inline typename FieldDescriptor<_id>::value_type* get( FieldId<_id> ) const
+	inline typename FieldDescriptor<_id>::value_type* operator [] ( FieldId<_id> ) const
 	{
 		static constexpr int index = find_index_of_id<_id,ids...>::index;
 		return std::get<index>(m_field_arrays);
