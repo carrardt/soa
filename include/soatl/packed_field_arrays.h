@@ -3,12 +3,12 @@
 #include <cstdint> // for size_t
 #include <cstdlib> // for size_t
 #include <memory>
+#include <tuple>
 
 #include <assert.h>
 
 #include "soatl/constants.h"
 #include "soatl/copy.h"
-#include "soatl/variadic_template_utils.h"
 #include "soatl/memory.h"
 
 namespace soatl {
@@ -19,13 +19,12 @@ struct PackedFieldArraysHelper
 	static constexpr size_t Alignment = A;
 	static constexpr size_t AlignmentLowMask = Alignment - 1;
 	static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
+	using ElementType = typename std::tuple_element< TI-1 , std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
 
 	static inline size_t field_offset( size_t capacity )
 	{
-		using ElementType = typename std::tuple_element< TI-1 , std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
-		size_t offset = PackedFieldArraysHelper<Alignment,TI-1,ids...>::field_offset( capacity );
-		offset += ( ( capacity * sizeof(ElementType) ) + AlignmentLowMask ) & AlignmentHighMask;
-		return offset;
+		return PackedFieldArraysHelper<Alignment,TI-1,ids...>::field_offset( capacity )
+		       + ( ( capacity * sizeof(ElementType) ) + AlignmentLowMask ) & AlignmentHighMask;
 	}
 };
 
@@ -33,7 +32,11 @@ template<size_t A, size_t... ids>
 struct PackedFieldArraysHelper<A,0,ids...>
 {
 	static inline constexpr size_t field_offset(size_t) { return 0; }
+
+	template<size_t capacity>
+	static inline constexpr size_t field_offset( std::integral_constant<size_t,capacity> capacityConstant ) { return 0; }
 };
+
 
 template< size_t _Alignment, size_t _ChunkSize, size_t... ids>
 struct PackedFieldArrays

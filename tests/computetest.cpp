@@ -10,6 +10,7 @@
 #include "soatl/packed_field_arrays.h"
 #include "soatl/variadic_template_utils.h"
 #include "soatl/field_pointers.h"
+#include "soatl/static_packed_field_arrays.h"
 
 #include "declare_fields.h"
 
@@ -176,6 +177,9 @@ int main(int argc, char* argv[])
 	{
 		std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
 	}
+
+	auto vectBuffer = soatl::make_static_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), soatl::cst::count<4>(), rx, ry, rz, dist, e );
+	std::cout<<"sizeof(vectBuffer)="<<sizeof(vectBuffer)<<", data_size="<<vectBuffer.data_size()<<std::endl;
 
 	return 0;
 }
