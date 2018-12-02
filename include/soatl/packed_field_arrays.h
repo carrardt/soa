@@ -51,19 +51,20 @@ struct PackedFieldArrays
 	static constexpr size_t chunksize() { return ChunkSize; }
 
 	template<size_t index>
-	inline typename std::tuple_element<index,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type * operator [] ( cst::at<index> ) const
+	inline typename std::tuple_element<index,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type * __restrict__ operator [] ( cst::at<index> ) const
 	{
 		using ValueType = typename std::tuple_element<index, std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
-		uint8_t* aptr = static_cast<uint8_t*>( m_storage_ptr );
-		ValueType* typed_pointer = reinterpret_cast<ValueType*>( aptr + PackedFieldArraysHelper<Alignment,index,ids...>::field_offset(capacity()) );
-		return typed_pointer;
+		uint8_t* aptr = static_cast<uint8_t*>( m_storage_ptr ) + PackedFieldArraysHelper<Alignment,index,ids...>::field_offset(capacity()) ;
+		return (ValueType* __restrict__) __builtin_assume_aligned( aptr , Alignment );
 	}
 
 	template<size_t _id>
-	inline typename FieldDescriptor<_id>::value_type * operator [] ( FieldId<_id> ) const
+	inline typename FieldDescriptor<_id>::value_type * __restrict__ operator [] ( FieldId<_id> ) const
 	{
 		static constexpr size_t index = find_index_of_id<_id,ids...>::index;
-		return (*this) [ cst::at<index>() ];
+		using ValueType = typename std::tuple_element<index, std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
+		uint8_t* aptr = static_cast<uint8_t*>( m_storage_ptr ) + PackedFieldArraysHelper<Alignment,index,ids...>::field_offset(capacity()) ;
+		return (ValueType* __restrict__) __builtin_assume_aligned( aptr , Alignment );
 	}
 
 	// resize container

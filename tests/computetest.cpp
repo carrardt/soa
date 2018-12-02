@@ -20,7 +20,7 @@ static inline void compute_distance( float& dist, double x, double y, double z, 
 	x = x - x2;
 	y = y - y2;
 	z = z - z2;
-	dist = std::exp(x2+y2+z2) / std::sqrt( x*x + y*y + z*z );
+	dist = /*std::exp(x2+y2+z2) / std::sqrt*/ ( x*x + y*y + z*z );
 }
 
 static inline void compute_distance_d( double& dist, double x, double y, double z, double x2, double y2, double z2 )
@@ -28,7 +28,7 @@ static inline void compute_distance_d( double& dist, double x, double y, double 
 	x = x - x2;
 	y = y - y2;
 	z = z - z2;
-	dist = std::exp(x2+y2+z2) / std::sqrt( x*x + y*y + z*z );
+	dist = std::exp(x2+y2+z2) / std::sqrt ( x*x + y*y + z*z );
 }
 
 
@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 			     x = ax - x;
 			     y = ay - y;
 			     z = az - z;
-			     d = std::sqrt(x*x+y*y+z*z);
+			     d = /*std::sqrt*/ (x*x+y*y+z*z);
 			 }
 			 , 0, N,
 			 zip[dist], zip[rx], zip[ry], zip[rz]
@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
 			     x = ax - x;
 			     y = ay - y;
 			     z = az - z;
-			     d = std::sqrt(x*x+y*y+z*z);
+			     d = /*std::sqrt*/ (x*x+y*y+z*z);
 			 }
 			 , 0, N,
 			 zip[e], zip[rx], zip[ry], zip[rz]
