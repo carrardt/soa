@@ -16,6 +16,7 @@ struct FieldPointers
 	static constexpr size_t Alignment = _Alignment;
 	static constexpr size_t TupleSize = sizeof...(FieldIds) ;
 
+	using FieldIdsTuple = std::tuple< FieldId<FieldIds> ... > ;
 	using ArrayTuple = std::tuple< typename FieldDescriptor<FieldIds>::value_type* ... > ;
 
 	inline FieldPointers(size_t s) : m_size(s)
@@ -24,17 +25,22 @@ struct FieldPointers
 	}
 
 	template<size_t _id>
-	inline typename FieldDescriptor<_id>::value_type* operator [] ( FieldId<_id> ) const
+	inline typename FieldDescriptor<_id>::value_type* __restrict__ operator [] ( FieldId<_id> ) const
 	{
+		using ValueType = typename FieldDescriptor<_id>::value_type;
 		static constexpr int index = find_index_of_id<_id,FieldIds...>::index;
-		return std::get<index>(m_field_arrays);
+		return (ValueType* __restrict__) __builtin_assume_aligned( std::get<index>(m_field_arrays) , Alignment );
 	}
 
 	template<size_t _id>
-	inline typename FieldDescriptor<_id>::value_type* & operator [] ( FieldId<_id> )
+	inline void set_pointer( FieldId<_id> , typename FieldDescriptor<_id>::value_type* ptr )
 	{
 		static constexpr int index = find_index_of_id<_id,FieldIds...>::index;
-		return std::get<index>(m_field_arrays);
+#		ifndef NDEBUG
+			size_t addr = reinterpret_cast<size_t>( ptr );
+			assert( (addr%Alignment) == 0 );
+#		endif
+		std::get<index>(m_field_arrays) = ptr;
 	}
 
 	inline size_t size() const { return m_size; }

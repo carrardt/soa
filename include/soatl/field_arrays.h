@@ -28,6 +28,7 @@ struct FieldArrays
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr size_t TupleSize = sizeof...(ids);
 
+	using FieldIdsTuple = std::tuple< FieldId<ids> ... > ;
 	using ArrayTuple = std::tuple< typename FieldDescriptor<ids>::value_type* ... > ;
 	using AllocStrategy = DefaultAllocationStrategy;
 

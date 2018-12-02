@@ -45,6 +45,7 @@ struct PackedFieldArrays
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr int TupleSize = sizeof...(ids);
 
+	using FieldIdsTuple = std::tuple< FieldId<ids> ... > ;
 	using AllocStrategy = DefaultAllocationStrategy;
 
 	static constexpr size_t alignment() { return Alignment; }
@@ -85,6 +86,7 @@ struct PackedFieldArrays
 	inline size_t size() const { return m_size; }
 	inline size_t capacity() const { return m_capacity; }
 	inline size_t chunk_ceil() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
+	inline size_t data_size() const { return allocation_size( capacity() ); }
 
 	inline ~PackedFieldArrays()
 	{

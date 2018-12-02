@@ -3,6 +3,8 @@
 #include "soatl/field_descriptor.h"
 #include <cstdlib> // for size_t
 #include <cstring>
+#include <algorithm>
+#include <tuple>
 
 namespace soatl
 {
@@ -13,10 +15,16 @@ namespace soatl
 		static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count )
 		{
 			using ValueType = typename FieldDescriptor<id>::value_type;
-			//std::cout<<"copy : field='"<< FieldDescriptor<id>::name() <<"', range=["<<start<<";"<<start+count<<"[, d="<<(void*)d<<", s="<<(void*)s<< std::endl;
+			/*
+			std::cout<<"copy : field='"<< FieldDescriptor<id>::name()
+				 <<"', range=["<<start<<";"<<start+count<<"[, d="
+				 <<(void*)(dst[FieldId<id>()]+start)<<", s="
+				 <<(void*)(src[FieldId<id>()]+start)
+				 << std::endl;
+			*/
 
 			// copy, version 1 : always work
-			std::memcpy( dst[FieldId<id>()]+start, src[ FieldId<id>() ]+start, sizeof(ValueType)*count );			
+			std::memcpy( dst[FieldId<id>()]+start, src[FieldId<id>()]+start, sizeof(ValueType)*count );			
 
 			// copy, version 2 : crashes if compiler generates aligned move instructions and arrays alignment is not sufficient. It happens with gcc 5.4 (-O3)
 			//auto d = dst[ FieldId<id>() ];
@@ -39,12 +47,35 @@ namespace soatl
 	};
 
 	template<typename DstArrays, typename SrcArrays, size_t... _ids>
-	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const FieldId<_ids>&... )
+	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const std::tuple< FieldId<_ids> ... > & )
 	{
 		assert( (start+count) <= dst.size() );
 		assert( (start+count) <= src.size() );
 		FieldArraysCopyHelper<DstArrays,SrcArrays,_ids...>::copy(dst,src,start,count);
 	}
 
+	template<typename DstArrays, typename SrcArrays, size_t... _ids>
+	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const FieldId<_ids>&... )
+	{
+		copy( dst, src, start, count, std::tuple<FieldId<_ids>...>() );
+	}
+
+	template<typename DstArrays, typename SrcArrays>
+	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count )
+	{
+		copy( dst, src, start, count, typename SrcArrays::FieldIdsTuple () );
+	}
+
+	template<typename DstArrays, typename SrcArrays, size_t... _ids>
+	static inline void copy( DstArrays& dst, const SrcArrays& src, const FieldId<_ids>&... )
+	{
+		copy( dst, src, 0, std::min(dst.size(),src.size()), typename SrcArrays::FieldIdsTuple () );
+	}
+
+	template<typename DstArrays, typename SrcArrays>
+	static inline void copy( DstArrays& dst, const SrcArrays& src)
+	{
+		copy( dst, src, 0, std::min(dst.size(),src.size()), typename SrcArrays::FieldIdsTuple () );
+	}
 }
 

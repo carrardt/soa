@@ -132,11 +132,11 @@ int main(int argc, char* argv[])
 	std::cout<<"borrow array pointers"<<std::endl; std::cout.flush();
 	auto zip = soatl::make_field_pointers( N, soatl::cst::align<64>(), soatl::cst::chunk<8>(), rx, ry, rz, e, dist );
 
-	zip[rx] = cell_arrays2[rx];
-	zip[ry] = cell_arrays2[ry];
-	zip[rz] = cell_arrays2[rz];
-	zip[dist] = cell_arrays1[dist];
-	zip[e] = cell_arrays1[e];
+	zip.set_pointer(rx , cell_arrays2[rx] );
+	zip.set_pointer(ry , cell_arrays2[ry] );
+	zip.set_pointer(rz , cell_arrays2[rz] );
+	zip.set_pointer(dist , cell_arrays1[dist] );
+	zip.set_pointer(e , cell_arrays1[e] );
 
 	std::cout<<"copy arrays"<<std::endl;
 	soatl::copy( zip , cell_arrays1 , 0, N, rx, ry, rz );
@@ -177,6 +177,7 @@ int main(int argc, char* argv[])
 		std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
 	}
 
+	return 0;
 }
 
 

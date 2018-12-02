@@ -275,6 +275,8 @@ int main(int argc, char* argv[])
 	test_field_arrays_aliasing<64,3>();
 	test_field_arrays_aliasing<64,6>();
 	test_field_arrays_aliasing<64,16>();
+
+	return 0;
 }
 
 
