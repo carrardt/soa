@@ -2,7 +2,6 @@
 
 namespace soatl
 {
-
 	struct ChunkIncrementalAllocationStrategy
 	{
 		static inline size_t update_capacity(size_t s, size_t capacity, size_t chunksize)
@@ -23,7 +22,6 @@ namespace soatl
 	};
 
 	using DefaultAllocationStrategy = ChunkIncrementalAllocationStrategy;
-
 }
 
 
