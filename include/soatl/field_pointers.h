@@ -43,6 +43,15 @@ struct FieldPointers
 		std::get<index>(m_field_arrays) = ptr;
 	}
 
+	template<typename ArraySet, size_t... otherd_ids>
+	inline void set_pointers( ArraySet& arrays , const FieldId<otherd_ids>& ...  )
+	{
+		static_assert( ( arrays.chunksize() % chunksize() ) == 0 , "Cannot copy pointer from an array with a smaller chunksize" );
+		TEMPLATE_LIST_BEGIN
+			set_pointer( FieldId<otherd_ids>() , arrays[FieldId<otherd_ids>()] )
+		TEMPLATE_LIST_END
+	}
+
 	inline size_t size() const { return m_size; }
 	inline size_t chunk_ceil() const { return ( (size()+chunksize()-1) / chunksize() ) * chunksize(); }
 	inline size_t capacity() const { return chunk_ceil(); }
@@ -61,9 +70,12 @@ private:
         inline void init( std::integral_constant<size_t,0> ) {}
 
 	ArrayTuple m_field_arrays;
-	size_t m_size = 0;
+	const size_t m_size;
 };
 
+
+
+// helper methods to create FieldPointers instances
 template<size_t A, size_t C, size_t... ids>
 static inline 
 FieldPointers<A,C,ids...>
@@ -72,6 +84,31 @@ make_field_pointers( size_t N, cst::align<A>, cst::chunk<C>, const FieldId<ids>&
 	return FieldPointers<A,C,ids...>( N );
 }
 
+template<size_t A, size_t C, size_t... ids>
+static inline 
+FieldPointers<A,C,ids...>
+make_field_pointers( size_t N, cst::align<A>, cst::chunk<C>, const std::tuple<FieldId<ids>...>& )
+{
+	return FieldPointers<A,C,ids...>( N );
+}
+
+
+template<typename ArraySetT, size_t... ids>
+static inline 
+FieldPointers<ArraySetT::Alignment,ArraySetT::ChunkSize,ids...>
+make_field_pointers( const ArraySetT& arrays, const FieldId<ids>& ... )
+{
+	return FieldPointers<ArraySetT::Alignment,ArraySetT::ChunkSize,ids...>( arrays.size() );
+}
+
+
+template<typename ArraySetT>
+static inline 
+auto
+make_field_pointers( const ArraySetT& arrays )
+{
+	return make_field_pointers( arrays.size(), cst::align<ArraySetT::Alignment>(), cst::chunk<ArraySetT::ChunkSize>(), ArraySetT::FieldIdsTuple() );
+}
 
 }
 

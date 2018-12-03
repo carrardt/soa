@@ -109,8 +109,11 @@ int main(int argc, char* argv[])
 	auto tmp2 = particle_tmp2;
 	auto dist = particle_dist;
 
-	auto cell_arrays1 = soatl::make_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), rx,ry,rz,e,dist );
-	auto cell_arrays2 = soatl::make_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), atype,rx,mid,ry,rz );
+	auto cell_arrays1 = soatl::make_field_arrays( rx,ry,rz,e,dist );
+	auto cell_arrays2 = soatl::make_packed_field_arrays( atype,rx,mid,ry,rz );
+
+	std::cout<<"arrays1: alignment="<<cell_arrays1.alignment()<<", chunksize="<<cell_arrays1.chunksize() <<std::endl;  std::cout.flush();
+	std::cout<<"arrays2: alignment="<<cell_arrays2.alignment()<<", chunksize="<<cell_arrays2.chunksize() <<std::endl;  std::cout.flush();
 
 	std::cout<<"resize arrays to "<<N<<std::endl;  std::cout.flush();
 	cell_arrays1.resize(N);
@@ -157,19 +160,20 @@ int main(int argc, char* argv[])
 	soatl::apply_simd( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl; std::cout.flush();
+		if(rdist(rng)>0.999) std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl; std::cout.flush();
 	}
 
 	std::cout<<"apply compute_distance to arrays (double)"<<std::endl;  std::cout.flush();
-	soatl::apply_simd( compute_distance_d , 0, N, e_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
+	soatl::apply_simd( compute_distance_d , N, e_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
+		if(rdist(rng)>0.999) std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
 	}
 
 
 	std::cout<<"borrow array pointers"<<std::endl; std::cout.flush();
-	auto zip = soatl::make_field_pointers( N, soatl::cst::align<64>(), soatl::cst::chunk<8>(), rx, ry, rz, e, dist );
+	// make a bunch of unmanaged pointers to fields rx, ry, rz, e and dist using size, alignment and chunksize from cell_arrays1
+	auto zip = soatl::make_field_pointers( cell_arrays1, rx, ry, rz, e, dist );
 
 	zip.set_pointer(rx , cell_arrays2[rx] );
 	zip.set_pointer(ry , cell_arrays2[ry] );
@@ -192,11 +196,11 @@ int main(int argc, char* argv[])
 			z = az - z;
 			d = /*std::sqrt*/ (x*x+y*y+z*z);
 		}
-		, 0, N, zip[dist], zip[rx], zip[ry], zip[rz] );
+		, zip, dist, rx, ry, rz );
 
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"dist["<<j<<"]="<<zip[dist][j]<<std::endl; std::cout.flush();
+		if(rdist(rng)>0.999) std::cout<<"dist["<<j<<"]="<<zip[dist][j]<<std::endl; std::cout.flush();
 	}
 
 	std::cout<<"apply lambda (double)"<<std::endl;
@@ -205,16 +209,49 @@ int main(int argc, char* argv[])
 			x = ax - x;
 			y = ay - y;
 			z = az - z;
-			d = /*std::sqrt*/(x*x+y*y+z*z);
+			d = std::sqrt(x*x+y*y+z*z);
 		}
-		, 0, N, zip[e], zip[rx], zip[ry], zip[rz] );
-
+		, 16, N-16, zip, e,rx,ry,rz );
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"e["<<j<<"]="<<zip[e][j]<<std::endl; std::cout.flush();
+		if(rdist(rng)>0.999) std::cout<<"e["<<j<<"]="<<zip[e][j]<<std::endl; std::cout.flush();
 	}
 
-	auto vect = soatl::make_static_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), soatl::cst::count<8>(), rx, ry, rz, dist, e );
+	auto unalignedzip = soatl::make_field_pointers( cell_arrays1.size(), soatl::cst::unaligned, soatl::cst::no_chunk, e,rx,ry,rz );
+	unalignedzip.set_pointers( cell_arrays1, e,rx,ry,rz );
+
+	std::cout<<"apply_simd lambda (double) to minmally aligned pointers with no chunk"<<std::endl;
+	soatl::apply_simd( [ax,ay,az](double& d, double x, double y, double z)
+		{
+			x = ax - x;
+			y = ay - y;
+			z = az - z;
+			d = std::sqrt(x*x+y*y+z*z);
+		}
+		, soatl::SimdRequirements<double>::chunksize
+		, N - soatl::SimdRequirements<double>::chunksize
+		, unalignedzip, e,rx,ry,rz );
+	for(size_t j=0;j<N;j++)
+	{
+		if(rdist(rng)>0.999) std::cout<<"e["<<j<<"]="<<zip[e][j]<<std::endl; std::cout.flush();
+	}
+
+	// ok, non-simd version does not require any alignment
+	std::cout<<"apply lambda (double) to unaligned pointers"<<std::endl;
+	soatl::apply( [ax,ay,az](double& d, double x, double y, double z)
+		{
+			x = ax - x;
+			y = ay - y;
+			z = az - z;
+			d = std::sqrt(x*x+y*y+z*z);
+		}
+		, 1, N-1, unalignedzip, e,rx,ry,rz );
+	for(size_t j=0;j<N;j++)
+	{
+		if(rdist(rng)>0.999) std::cout<<"e["<<j<<"]="<<zip[e][j]<<std::endl; std::cout.flush();
+	}
+
+	auto vect = soatl::make_static_packed_field_arrays( soatl::cst::count<128>(), rx, ry, rz, dist, e );
 	std::cout<<"sizeof(vect)="<<sizeof(vect)<<", data_size="<<vect.data_size()<<", size="<<vect.size()<<std::endl; std::cout.flush();
 
 	std::cout<<"check vect alignment and aliasing"<<std::endl; std::cout.flush();
@@ -229,14 +266,14 @@ int main(int argc, char* argv[])
 				x = ax - x;
 				y = ay - y;
 				z = az - z;
-				d = std::sqrt(x*x+y*y+z*z);
+				d = /*std::sqrt*/ (x*x+y*y+z*z);
 			}
 			, vect, e, rx, ry, rz );
 		
 		std::cout<<"print vect"<<std::endl; std::cout.flush();
 		for(size_t j=0;j<vect.size();j++)
 		{
-			std::cout<<"e["<<j<<"]="<<vect[e][j]<<std::endl; std::cout.flush();
+			if(rdist(rng)>0.99) std::cout<<"e["<<j<<"]="<<vect[e][j]<<std::endl; std::cout.flush();
 		}
 	}
 

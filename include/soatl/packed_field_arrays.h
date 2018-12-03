@@ -10,6 +10,7 @@
 #include "soatl/constants.h"
 #include "soatl/copy.h"
 #include "soatl/memory.h"
+#include "soatl/simd.h"
 
 namespace soatl {
 

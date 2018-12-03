@@ -85,7 +85,15 @@ inline
 StaticPackedFieldArrays<A,C,N,ids...>
 make_static_packed_field_arrays( cst::align<A>, cst::chunk<C>, cst::count<N>, const FieldId<ids>& ...)
 {
-	return StaticPackedFieldArrays<A,C,N,ids...>();
+	return StaticPackedFieldArrays<A,C,((N+C-1)/C)*C,ids...>();
+}
+
+template<size_t N, size_t... ids>
+inline
+StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,N,ids...>
+make_static_packed_field_arrays( cst::count<N>, const FieldId<ids>& ...)
+{
+	return StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,((N+DEFAULT_CHUNK_SIZE-1)/DEFAULT_CHUNK_SIZE)*DEFAULT_CHUNK_SIZE,ids...>();
 }
 
 } // namespace soatl

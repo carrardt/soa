@@ -9,6 +9,7 @@
 #include "soatl/field_descriptor.h"
 #include "soatl/constants.h"
 #include "soatl/memory.h"
+#include "soatl/simd.h"
 
 /*
 The  function posix_memalign() allocates size bytes and places the address of the allocated memory in *memptr.  The address of the allocated memory will be a multiple of alignment, which must
