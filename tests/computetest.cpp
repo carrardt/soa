@@ -11,6 +11,7 @@
 #include "soatl/variadic_template_utils.h"
 #include "soatl/field_pointers.h"
 #include "soatl/static_packed_field_arrays.h"
+#include "soatl/compute.h"
 
 #include "declare_fields.h"
 
@@ -29,19 +30,7 @@ static inline void compute_distance_d( double& dist, double x, double y, double 
 	x = x - x2;
 	y = y - y2;
 	z = z - z2;
-	dist = std::exp(x2+y2+z2) / std::sqrt ( x*x + y*y + z*z );
-}
-
-
-template<typename OperatorT, typename... ArrayP>
-static inline void apply_to_arrays( OperatorT f, size_t first, size_t N, ArrayP __restrict__ ... arraypack )
-{
-	size_t last = first+N;
-	#pragma omp simd
-	for(size_t i=first;i<last;i++)
-	{
-		f( arraypack[i] ... );
-	}
+	dist = /*std::exp(x2+y2+z2) / std::sqrt*/ ( x*x + y*y + z*z );
 }
 
 template<typename T, size_t id>
@@ -50,6 +39,55 @@ static inline void print_field_info(const T& arrays, soatl::FieldId<id> f)
 	auto ptr = arrays[f];
 	std::cout<<soatl::FieldDescriptor<id>::name()<<" : array type is "<<typeid(ptr).name()<<std::endl;
 }
+
+
+template<size_t A, size_t C, size_t N, size_t... ids>
+static inline void check_static_fields( soatl::StaticPackedFieldArrays<A,C,N,ids...>& field_arrays)
+{
+	size_t alignment = field_arrays.alignment();
+	const void* ptr;
+	size_t addr;
+	TEMPLATE_LIST_BEGIN
+		ptr = field_arrays[soatl::FieldId<ids>()] ,
+		addr = reinterpret_cast<size_t>(ptr) ,
+		assert( ( addr % alignment ) == 0 ) 
+	TEMPLATE_LIST_END
+	
+	size_t count = field_arrays.size();
+	size_t k = 0;
+	for(size_t i=0;i<count;i++)
+        {
+		TEMPLATE_LIST_BEGIN
+			field_arrays[soatl::FieldId<ids>()][i] = static_cast<typename soatl::FieldDescriptor<ids>::value_type>( k ) ,
+			++k
+		TEMPLATE_LIST_END
+	}
+	// read from and write to the area beyond size() and up to next chunk boundary
+	for(size_t i=count;i<field_arrays.chunk_ceil();i++)
+        {
+		TEMPLATE_LIST_BEGIN
+			k += static_cast<size_t>( field_arrays[soatl::FieldId<ids>()][i] ) ,
+			field_arrays[soatl::FieldId<ids>()][i] = static_cast<typename soatl::FieldDescriptor<ids>::value_type>( k ) 
+		TEMPLATE_LIST_END
+	}
+
+	// read back values in [0;size()[ to check values are still correct
+	k=0;
+	for(size_t i=0;i<count;i++)
+        {
+		bool value_ok = false;
+		size_t findex = 0;
+		TEMPLATE_LIST_BEGIN
+			value_ok = field_arrays[soatl::FieldId<ids>()][i] == static_cast<typename soatl::FieldDescriptor<ids>::value_type>( k ) ,
+			//std::cout<<"value["<<findex<<"]="<< (size_t)(field_arrays[fids][i] )<<std::endl ,
+			assert(value_ok) ,
+			++ findex ,
+			++k
+		TEMPLATE_LIST_END
+	}
+
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -116,14 +154,14 @@ int main(int argc, char* argv[])
 	}
 	
 	std::cout<<"apply compute_distance to arrays (float)"<<std::endl;  std::cout.flush();
-	apply_to_arrays( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
+	soatl::apply_simd( compute_distance , 0, N, dist_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
 	for(size_t j=0;j<N;j++)
 	{
 		std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl; std::cout.flush();
 	}
 
 	std::cout<<"apply compute_distance to arrays (double)"<<std::endl;  std::cout.flush();
-	apply_to_arrays( compute_distance_d , 0, N, e_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
+	soatl::apply_simd( compute_distance_d , 0, N, e_ptr, rx_ptr, ry_ptr, rz_ptr, rx2_ptr, ry2_ptr, rz2_ptr );
 	for(size_t j=0;j<N;j++)
 	{
 		std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
@@ -142,44 +180,65 @@ int main(int argc, char* argv[])
 	std::cout<<"copy arrays"<<std::endl;
 	soatl::copy( zip , cell_arrays1 , 0, N, rx, ry, rz );
 
-	double ax = rx2_ptr[0];
-	double ay = ry2_ptr[0];
-	double az = rz2_ptr[0];
+	const double ax = rx2_ptr[0];
+	const double ay = ry2_ptr[0];
+	const double az = rz2_ptr[0];
 
 	std::cout<<"apply lambda (float)"<<std::endl;
-	apply_to_arrays( [ax,ay,az](float& d, double x, double y, double z)
-			 {
-			     x = ax - x;
-			     y = ay - y;
-			     z = az - z;
-			     d = /*std::sqrt*/ (x*x+y*y+z*z);
-			 }
-			 , 0, N,
-			 zip[dist], zip[rx], zip[ry], zip[rz]
-			 );
+	soatl::apply_simd( [ax,ay,az](float& d, double x, double y, double z)
+		{
+			x = ax - x;
+			y = ay - y;
+			z = az - z;
+			d = /*std::sqrt*/ (x*x+y*y+z*z);
+		}
+		, 0, N, zip[dist], zip[rx], zip[ry], zip[rz] );
+
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"dist["<<j<<"]="<<dist_ptr[j]<<std::endl; std::cout.flush();
+		std::cout<<"dist["<<j<<"]="<<zip[dist][j]<<std::endl; std::cout.flush();
 	}
 
 	std::cout<<"apply lambda (double)"<<std::endl;
-	apply_to_arrays( [ax,ay,az](double& d, double x, double y, double z)
-			 {
-			     x = ax - x;
-			     y = ay - y;
-			     z = az - z;
-			     d = /*std::sqrt*/ (x*x+y*y+z*z);
-			 }
-			 , 0, N,
-			 zip[e], zip[rx], zip[ry], zip[rz]
-			 );
+	soatl::apply_simd( [ax,ay,az](double& d, double x, double y, double z)
+		{
+			x = ax - x;
+			y = ay - y;
+			z = az - z;
+			d = /*std::sqrt*/(x*x+y*y+z*z);
+		}
+		, 0, N, zip[e], zip[rx], zip[ry], zip[rz] );
+
 	for(size_t j=0;j<N;j++)
 	{
-		std::cout<<"e["<<j<<"]="<<e_ptr[j]<<std::endl; std::cout.flush();
+		std::cout<<"e["<<j<<"]="<<zip[e][j]<<std::endl; std::cout.flush();
 	}
 
-	auto vectBuffer = soatl::make_static_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), soatl::cst::count<4>(), rx, ry, rz, dist, e );
-	std::cout<<"sizeof(vectBuffer)="<<sizeof(vectBuffer)<<", data_size="<<vectBuffer.data_size()<<std::endl;
+	auto vect = soatl::make_static_packed_field_arrays( soatl::cst::align<64>(), soatl::cst::chunk<8>(), soatl::cst::count<8>(), rx, ry, rz, dist, e );
+	std::cout<<"sizeof(vect)="<<sizeof(vect)<<", data_size="<<vect.data_size()<<", size="<<vect.size()<<std::endl; std::cout.flush();
+
+	std::cout<<"check vect alignment and aliasing"<<std::endl; std::cout.flush();
+	check_static_fields( vect );
+	if( N >= vect.size() )
+	{
+		std::cout<<"copy to vect"<<std::endl; std::cout.flush();
+		soatl::copy( vect, cell_arrays1, rx,ry,rz,dist,e );
+		std::cout<<"compute on vect"<<std::endl; std::cout.flush();
+		soatl::apply_simd( [ax,ay,az](double& d, double x, double y, double z)
+			{
+				x = ax - x;
+				y = ay - y;
+				z = az - z;
+				d = std::sqrt(x*x+y*y+z*z);
+			}
+			, vect, e, rx, ry, rz );
+		
+		std::cout<<"print vect"<<std::endl; std::cout.flush();
+		for(size_t j=0;j<vect.size();j++)
+		{
+			std::cout<<"e["<<j<<"]="<<vect[e][j]<<std::endl; std::cout.flush();
+		}
+	}
 
 	return 0;
 }

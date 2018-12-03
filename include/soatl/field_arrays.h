@@ -21,6 +21,7 @@ namespace soatl {
 template<size_t _Alignment, size_t _ChunkSize, size_t... ids >
 struct FieldArrays
 {
+	static constexpr bool assert_alignment_is_power_of_2 = AssertPowerOf2<_Alignment>::value;
         static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
         static constexpr size_t Alignment = (1ul<<AlignmentLog2);
         static constexpr size_t AlignmentLowMask = Alignment - 1;

@@ -66,6 +66,7 @@ int main(int argc, char* argv[])
 	// all these variants need to be tested
 	soatl::copy( serialize_arrays , in_arrays, 0, N/2 );
 	soatl::copy( serialize_arrays , in_arrays, N/2, N/2, rx, ry );
+	soatl::copy( serialize_arrays , in_arrays, N/2, N, rx, ry );
 	soatl::copy( serialize_arrays , in_arrays, rz,e,atype,mid );
 
 	soatl::copy( serialize_arrays , in_arrays );
