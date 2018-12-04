@@ -22,10 +22,30 @@
 #define TEST_CHUNK_SIZE 16
 #endif
 
+#ifndef TEST_USE_SIMD
+#define TEST_USE_SIMD 1
+#endif
+
+#ifndef TEST_DOUBLE_PRECISION
+#define TEST_DOUBLE_PRECISION 1
+#endif
+
+#if TEST_DOUBLE_PRECISION
+auto field_e = particle_e;
+auto field_rx = particle_rx;
+auto field_ry = particle_ry;
+auto field_rz = particle_rz;
+#else
+auto field_e = particle_e_f;
+auto field_rx = particle_rx_f;
+auto field_ry = particle_ry_f;
+auto field_rz = particle_rz_f;
+#endif
+
 std::default_random_engine rng;
 
 template<typename ArraysT, size_t idDist, size_t idRx, size_t idRy, size_t idRz>
-inline double benchmark(ArraysT& arrays, size_t N, bool use_simd, soatl::FieldId<idDist> dist, soatl::FieldId<idRx> rx, soatl::FieldId<idRy> ry, soatl::FieldId<idRz> rz)
+inline double benchmark(ArraysT& arrays, size_t N, soatl::FieldId<idDist> dist, soatl::FieldId<idRx> rx, soatl::FieldId<idRy> ry, soatl::FieldId<idRz> rz)
 {
   static constexpr size_t nCycles = 100;
   using DistT = typename soatl::FieldDescriptor<idDist>::value_type;
@@ -51,8 +71,7 @@ inline double benchmark(ArraysT& arrays, size_t N, bool use_simd, soatl::FieldId
     PosT az = arrays[rz][0];
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    if( use_simd )
-    {
+#   if TEST_USE_SIMD 
 	    soatl::apply_simd( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z)
 		    {
 			    x = x - ax;
@@ -61,9 +80,7 @@ inline double benchmark(ArraysT& arrays, size_t N, bool use_simd, soatl::FieldId
 			    d = std::sqrt( x*x + y*y + z*z );
 		    }
 		    , arrays, dist, rx, ry, rz );
-    }
-    else
-    {
+#   else
 	    soatl::apply( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z)
 		    {
 			    x = x - ax;
@@ -72,7 +89,7 @@ inline double benchmark(ArraysT& arrays, size_t N, bool use_simd, soatl::FieldId
 			    d = std::sqrt( x*x + y*y + z*z );
 		    }
 		    , arrays, dist, rx, ry, rz );
-    }
+#   endif
     auto t2 = std::chrono::high_resolution_clock::now();
     timens += t2-t1;
     		  
@@ -101,8 +118,6 @@ int main(int argc, char* argv[])
 	int seed = 0;
 	size_t N = 10000;
 	ArraysImplementation arraysImpl = FIELD_ARRAYS;
-	bool double_precision = true;
-	bool use_simd = false;
 
   if(argc>=2) 
 	{
@@ -112,38 +127,24 @@ int main(int argc, char* argv[])
 	  else if( option == "spfa" ) { arraysImpl = STATIC_PACKED_FIELD_ARRAYS; }
 	}
 
-  if(argc>=3) 
+	if(argc>=3)
 	{
-	  std::string option = argv[2];
-	  if( option=="s" ) { double_precision = false; }
+	  N = atoi(argv[2]);
 	}
-
-  if(argc>=4) 
+	if(argc>=4)
 	{
-	  std::string option = argv[3];
-	  if( option=="vec" ) { use_simd = true; }
-	}
-
-	if(argc>=5)
-	{
-	  N = atoi(argv[4]);
-	}
-	if(argc>=6)
-	{
-	  seed = atoi(argv[5]);
+	  seed = atoi(argv[3]);
 	}
 
   if(arraysImpl == STATIC_PACKED_FIELD_ARRAYS) { N = S; }
 
   std::cout<<"SIMD arch="<<soatl::simd_arch();
-  if(double_precision)
-  {
+# if TEST_DOUBLE_PRECISION
     std::cout<<" a="<< soatl::SimdRequirements<double>::alignment <<" c=" << soatl::SimdRequirements<double>::chunksize;
-  }
-  else
-  {
+# else
     std::cout<<" a="<< soatl::SimdRequirements<float>::alignment <<" c=" << soatl::SimdRequirements<float>::chunksize;
-  }
+# endif
+
   std::cout<<", type=";
 	switch( arraysImpl )
 	{
@@ -151,52 +152,46 @@ int main(int argc, char* argv[])
 	  case PACKED_FIELD_ARRAYS: std::cout<<"PackedFieldArrays"; break;
 	  case STATIC_PACKED_FIELD_ARRAYS: std::cout<<"StaticPackedFieldArrays"; break;
   }
-  std::cout<<", dp="<<double_precision<<", vec="<<use_simd<<", N="<<N<<", seed="<<seed<<std::endl;
-  
-  
+
+# if TEST_DOUBLE_PRECISION
+  std::cout<<", double";
+# else
+  std::cout<<", float";
+# endif
+
+# if TEST_USE_SIMD 
+  std::cout<<", vec";
+# else
+  std::cout<<", scal";
+# endif
+
+  std::cout<<", N="<<N<<", seed="<<seed<<std::endl;
+
 	rng.seed( seed );
 
   double result = 0.0;
+
 	switch( arraysImpl )
 	{
 	  case FIELD_ARRAYS:
-	    if(double_precision)
 	    {
-	      auto arrays = soatl::make_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), particle_rx, particle_ry, particle_rz, particle_e);
-	      result = benchmark(arrays,N,use_simd,particle_e,particle_rx, particle_ry, particle_rz);
-	    }
-	    else
-	    {
-	      auto arrays = soatl::make_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), particle_rx_f, particle_ry_f, particle_rz_f, particle_e_f);
-	      result = benchmark(arrays,N,use_simd,particle_e_f,particle_rx_f, particle_ry_f, particle_rz_f);
+	      auto arrays = soatl::make_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), field_rx, field_ry, field_rz, field_e);
+	      result = benchmark(arrays,N,field_e,field_rx,field_ry,field_rz);
 	    }
 	    break;
 
 	  case PACKED_FIELD_ARRAYS:
-	    if(double_precision)
 	    {
-	      auto arrays = soatl::make_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), particle_rx, particle_ry, particle_rz, particle_e);
-	      result = benchmark(arrays,N,use_simd,particle_e,particle_rx, particle_ry, particle_rz);
-	    }
-	    else
-	    {
-	      auto arrays = soatl::make_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), particle_rx_f, particle_ry_f, particle_rz_f, particle_e_f);
-	      result = benchmark(arrays,N,use_simd,particle_e_f,particle_rx_f, particle_ry_f, particle_rz_f);
+	      auto arrays = soatl::make_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), field_rx, field_ry, field_rz, field_e);
+	      result = benchmark(arrays,N,field_e,field_rx,field_ry,field_rz);
 	    }
 	    break;
 
 	  case STATIC_PACKED_FIELD_ARRAYS:
-	    if(double_precision)
 	    {
 	      auto arrays = soatl::make_static_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), soatl::cst::count<S>(),
-	                    particle_rx, particle_ry, particle_rz, particle_e);
-	      result = benchmark(arrays,S,use_simd,particle_e,particle_rx, particle_ry, particle_rz);
-	    }
-	    else
-	    {
-	      auto arrays = soatl::make_static_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(),  soatl::cst::count<S>(),
-	                    particle_rx_f, particle_ry_f, particle_rz_f, particle_e_f);
-	      result = benchmark(arrays,S,use_simd,particle_e_f,particle_rx_f, particle_ry_f, particle_rz_f);
+	                    field_rx, field_ry, field_rz, field_e);
+	      result = benchmark(arrays,S,field_e,field_rx,field_ry,field_rz);
 	    }
 	    break;
 	}
