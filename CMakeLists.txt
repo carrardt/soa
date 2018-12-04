@@ -17,7 +17,10 @@ find_package(OpenMP REQUIRED)
 get_filename_component(BINUTILS_DIR ${CMAKE_LINKER} DIRECTORY)
 find_file(SOATL_OBJDUMP objdump HINTS ${BINUTILS_DIR})
 
-# base test : alignment, chunk boundaries, aliasing, resize, etc.
+# Install commands
+install(DIRECTORY include/soatl DESTINATION include)
+
+# build tests binaries
 add_executable(soatltest tests/soatest.cpp)
 target_include_directories(soatltest PUBLIC include)
 target_compile_options(soatltest PUBLIC ${OpenMP_CXX_FLAGS})
@@ -33,6 +36,19 @@ target_include_directories(soatlserializetest PUBLIC include)
 target_compile_options(soatlserializetest PUBLIC ${OpenMP_CXX_FLAGS})
 target_link_libraries(soatlserializetest ${OpenMP_LIBRARIES})
 
+# register tests
+enable_testing()
+add_test(NAME soatl_test1 COMMAND soatltest 1000 0)
+add_test(NAME soatl_test2 COMMAND soatltest 1000 34523452)
+add_test(NAME soatl_test3 COMMAND soatltest 1000 1976)
+add_test(NAME soatl_test4 COMMAND soatltest 1000 234234234)
+add_test(NAME soatl_compute1 COMMAND soatlcomputetest 1000 0)
+add_test(NAME soatl_compute2 COMMAND soatlcomputetest 1000 34523452)
+add_test(NAME soatl_compute3 COMMAND soatlcomputetest 1000 1976)
+add_test(NAME soatl_compute4 COMMAND soatlcomputetest 1000 234234234)
+add_test(NAME soatl_serialize COMMAND soatlserializetest 10000)
+
+# benchmarking
 if(SOATL_OBJDUMP)
   add_custom_target(vecreport)
 endif()
@@ -53,7 +69,11 @@ macro(GenerateBenchmark A C DPS SIMD)
   add_executable(soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} tests/benchmark.cpp)
   target_include_directories(soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} PUBLIC include)
   target_compile_options(soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} PUBLIC ${OpenMP_CXX_FLAGS} ${COMPFLAGS} -DTEST_ALIGNMENT=${A} -DTEST_CHUNK_SIZE=${C} -DTEST_DOUBLE_PRECISION=${DP})
-  target_link_libraries(soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} ${OpenMP_LIBRARIES})  
+  target_link_libraries(soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} ${OpenMP_LIBRARIES})
+  # add perf tests
+  add_test(NAME soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX}_fa COMMAND soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} fa 1000000)
+  add_test(NAME soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX}_pfa COMMAND soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX} pfa 1000000)
+  # assembly analysis
   if(SOATL_OBJDUMP)
     add_custom_target(vecreport_${A}_${C}_${DPS}_${SUFFIX}
                   COMMAND ${CMAKE_COMMAND} -DBINARY_FILE="$<TARGET_FILE:soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX}>" -DSOATL_OBJDUMP="${SOATL_OBJDUMP}" -P ${CMAKE_CURRENT_SOURCE_DIR}/vecreport.cmake
@@ -71,19 +91,4 @@ GenerateBenchmark(16 4 d ON)
 GenerateBenchmark(16 4 f ON)
 GenerateBenchmark(1 1 d OFF)
 GenerateBenchmark(1 1 f OFF)
-
-# tests
-enable_testing()
-add_test(NAME soatl_test1 COMMAND soatltest 1000 0)
-add_test(NAME soatl_test2 COMMAND soatltest 1000 34523452)
-add_test(NAME soatl_test3 COMMAND soatltest 1000 1976)
-add_test(NAME soatl_test4 COMMAND soatltest 1000 234234234)
-add_test(NAME soatl_compute1 COMMAND soatlcomputetest 1000 0)
-add_test(NAME soatl_compute2 COMMAND soatlcomputetest 1000 34523452)
-add_test(NAME soatl_compute3 COMMAND soatlcomputetest 1000 1976)
-add_test(NAME soatl_compute4 COMMAND soatlcomputetest 1000 234234234)
-
-add_test(NAME soatl_serialize COMMAND soatlserializetest 10000)
-# Install commands
-install(DIRECTORY include/soatl DESTINATION include)
 

@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
 	size_t N = 10000;
 	ArraysImplementation arraysImpl = FIELD_ARRAYS;
 
-  if(argc>=2) 
+  if(argc>=2)
 	{
 	  std::string option = argv[1];
 	  if( option == "fa" ) { arraysImpl = FIELD_ARRAYS; }
@@ -131,6 +131,7 @@ int main(int argc, char* argv[])
 	{
 	  N = atoi(argv[2]);
 	}
+
 	if(argc>=4)
 	{
 	  seed = atoi(argv[3]);
@@ -191,7 +192,8 @@ int main(int argc, char* argv[])
 	    {
 	      auto arrays = soatl::make_static_packed_field_arrays( soatl::cst::align<TEST_ALIGNMENT>(), soatl::cst::chunk<TEST_CHUNK_SIZE>(), soatl::cst::count<S>(),
 	                    field_rx, field_ry, field_rz, field_e);
-	      result = benchmark(arrays,S,field_e,field_rx,field_ry,field_rz);
+	      N = arrays.size();
+	      result = benchmark(arrays,N,field_e,field_rx,field_ry,field_rz);
 	    }
 	    break;
 	}
