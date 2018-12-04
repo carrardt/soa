@@ -76,24 +76,26 @@ struct alignas(_Alignment) StaticPackedFieldArrays
 	inline uint8_t* data() { return m_storage; }
 	inline const uint8_t* data() const { return m_storage; }
 
+  static inline void resize(size_t N) { if(N!=size()) { abort(); } }
+
 private:
 	uint8_t m_storage[ AllocationSize ];
 };
 
 template<size_t A, size_t C, size_t N, size_t... ids>
 inline
-StaticPackedFieldArrays<A,C,N,ids...>
+StaticPackedFieldArrays<A,C,(N+C-1)/C,ids...>
 make_static_packed_field_arrays( cst::align<A>, cst::chunk<C>, cst::count<N>, const FieldId<ids>& ...)
 {
-	return StaticPackedFieldArrays<A,C,((N+C-1)/C)*C,ids...>();
+	return StaticPackedFieldArrays<A,C,(N+C-1)/C,ids...>();
 }
 
 template<size_t N, size_t... ids>
 inline
-StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,N,ids...>
+StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,(N+DEFAULT_CHUNK_SIZE-1)/DEFAULT_CHUNK_SIZE,ids...>
 make_static_packed_field_arrays( cst::count<N>, const FieldId<ids>& ...)
 {
-	return StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,((N+DEFAULT_CHUNK_SIZE-1)/DEFAULT_CHUNK_SIZE)*DEFAULT_CHUNK_SIZE,ids...>();
+	return StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,(N+DEFAULT_CHUNK_SIZE-1)/DEFAULT_CHUNK_SIZE,ids...>();
 }
 
 } // namespace soatl

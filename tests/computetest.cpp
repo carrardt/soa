@@ -219,7 +219,6 @@ int main(int argc, char* argv[])
 
 	auto unalignedzip = soatl::make_field_pointers( cell_arrays1.size(), soatl::cst::unaligned, soatl::cst::no_chunk, e,rx,ry,rz );
 	unalignedzip.set_pointers( cell_arrays1, e,rx,ry,rz );
-
 	std::cout<<"apply_simd lambda (double) to minmally aligned pointers with no chunk"<<std::endl;
 	soatl::apply_simd( [ax,ay,az](double& d, double x, double y, double z)
 		{

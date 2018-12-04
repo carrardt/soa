@@ -20,8 +20,10 @@ struct SimdRequirements
 	static constexpr size_t alignment=_a; \
 	static constexpr size_t chunksize=_c; }
 
+
 #if defined(__AVX512F__)
 
+inline const char* simd_arch() { return "AVX512"; }
 SET_ARCH_SIMD_REQUIREMENT(double   ,64,8);
 SET_ARCH_SIMD_REQUIREMENT(float	   ,64,16);
 SET_ARCH_SIMD_REQUIREMENT(int64_t  ,64,8);
@@ -35,6 +37,7 @@ SET_ARCH_SIMD_REQUIREMENT(uint8_t  ,64,16);
 
 #elif defined(__AVX2__) || defined(__AVX__)
 
+inline const char* simd_arch() { return "AVX"; }
 SET_ARCH_SIMD_REQUIREMENT(double   ,32,4);
 SET_ARCH_SIMD_REQUIREMENT(float	   ,32,8);
 SET_ARCH_SIMD_REQUIREMENT(int64_t  ,32,4);
@@ -48,6 +51,7 @@ SET_ARCH_SIMD_REQUIREMENT(uint8_t  ,32,8);
 
 #elif defined(__SSE4_2__) || defined(__SSE4_1__) || defined(__SSE3__) || defined(__SSE2__) || defined(__SSE__)
 
+inline const char* simd_arch() { return "SSE"; }
 SET_ARCH_SIMD_REQUIREMENT(double   ,16,2);
 SET_ARCH_SIMD_REQUIREMENT(float	   ,16,4);
 SET_ARCH_SIMD_REQUIREMENT(int64_t  ,16,2);
@@ -58,10 +62,11 @@ SET_ARCH_SIMD_REQUIREMENT(int16_t  ,16,4);
 SET_ARCH_SIMD_REQUIREMENT(uint16_t ,16,4);
 SET_ARCH_SIMD_REQUIREMENT(int8_t   ,16,4);
 SET_ARCH_SIMD_REQUIREMENT(uint8_t  ,16,4);
-static inline const char* simd_arch() { return "SSE"; }
 
 #else
-static inline const char* simd_arch() { return "<unknown>"; }
+
+inline const char* simd_arch() { return "<unknown>"; }
+
 #endif
 
 // prefered default alignment and chunk size on this machine

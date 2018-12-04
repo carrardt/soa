@@ -9,3 +9,8 @@ SOATL_DECLARE_FIELD(float	,particle_dist	,"Particle pair distance")
 SOATL_DECLARE_FIELD(int16_t	,particle_tmp1	,"Particle Temporary 1")
 SOATL_DECLARE_FIELD(int8_t	,particle_tmp2	,"Particle Temporary 2")
 
+SOATL_DECLARE_FIELD(float	,particle_rx_f	,"Particle position X (single precision)")
+SOATL_DECLARE_FIELD(float	,particle_ry_f	,"Particle position Y (single precision)")
+SOATL_DECLARE_FIELD(float	,particle_rz_f	,"Particle position Z (single precision)")
+SOATL_DECLARE_FIELD(float	,particle_e_f	,"Particle energy (single precision)")
+
