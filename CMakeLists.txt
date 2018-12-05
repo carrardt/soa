@@ -76,7 +76,8 @@ macro(GenerateBenchmark A C DPS SIMD)
   # assembly analysis
   if(SOATL_OBJDUMP)
     add_custom_target(vecreport_${A}_${C}_${DPS}_${SUFFIX}
-                  COMMAND ${CMAKE_COMMAND} -DBINARY_FILE="$<TARGET_FILE:soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX}>" -DSOATL_OBJDUMP="${SOATL_OBJDUMP}" -P ${CMAKE_CURRENT_SOURCE_DIR}/vecreport.cmake
+                  COMMAND ${CMAKE_COMMAND} -DBINARY_FILE="$<TARGET_FILE:soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX}>" -DSOATL_OBJDUMP="${SOATL_OBJDUMP}"
+                  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/vecreport.cmake
                   DEPENDS soatlbenchmark_${A}_${C}_${DPS}_${SUFFIX})
     add_dependencies(vecreport vecreport_${A}_${C}_${DPS}_${SUFFIX})
   endif()

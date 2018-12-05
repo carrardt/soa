@@ -4,15 +4,18 @@ execute_process(COMMAND ${SOATL_OBJDUMP} -D ${BINARY_FILE} OUTPUT_FILE ${BINARY_
 
 file(STRINGS ${BINARY_FILE}.asm BINARRY_ASSEMBLY)
 
-set(INSLIST vmov vmovapd vmovaps vmovupd vmovups sqrt vsqrtpd vrsqrtpd vsqrtps vrsqrtps vsqrtsd vrsqrtsd vsqrtss vrsqrtss)
+set(INSLIST vmov vmovapd vmovaps vmovupd vmovups sqrt vsqrtpd vrsqrtpd vsqrtps vrsqrtps vsqrtsd vrsqrtsd vsqrtss vrsqrtss vfmadd132sd vfmadd132pd vfmadd132ss vfmadd132ps)
 
 set(mova vmovapd vmovaps)
 set(movu vmovupd vmovups)
 set(sqrtp vsqrtpd vrsqrtpd vsqrtps vrsqrtps)
 set(sqrts vsqrtsd vrsqrtsd vsqrtss vrsqrtss)
-set(INSSUM mova movu sqrtp sqrts)
+set(fmas vfmadd132sd vfmadd132ss)
+set(fmap vfmadd132pd vfmadd132ps)
+set(fma vfmadd132sd vfmadd132ss vfmadd132pd vfmadd132ps)
+set(INSSUM mova movu sqrtp sqrts fmas fmap)
 
-set(INSREPORT vmov mova movu sqrt sqrtp sqrts)
+set(INSREPORT mova movu sqrtp sqrts fmap fmas)
 
 foreach(ins ${INSLIST})
   set(${ins} 0)
