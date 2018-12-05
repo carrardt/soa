@@ -8,8 +8,8 @@
 
 namespace soatl
 {
-	template<typename DstArrays, typename SrcArrays, size_t... _ids> struct FieldArraysCopyHelper;
-	template<typename DstArrays, typename SrcArrays, size_t id, size_t... _ids>
+	template<typename DstArrays, typename SrcArrays, typename... _ids> struct FieldArraysCopyHelper;
+	template<typename DstArrays, typename SrcArrays, typename id, typename... _ids>
 	struct FieldArraysCopyHelper<DstArrays,SrcArrays, id, _ids...>
 	{
 		static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count )
@@ -46,7 +46,7 @@ namespace soatl
 		static inline void copy(DstArrays&,const SrcArrays&,size_t,size_t) {}
 	};
 
-	template<typename DstArrays, typename SrcArrays, size_t... _ids>
+	template<typename DstArrays, typename SrcArrays, typename... _ids>
 	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const std::tuple< FieldId<_ids> ... > & )
 	{
 		assert( (start+count) <= dst.size() );
@@ -54,7 +54,7 @@ namespace soatl
 		FieldArraysCopyHelper<DstArrays,SrcArrays,_ids...>::copy(dst,src,start,count);
 	}
 
-	template<typename DstArrays, typename SrcArrays, size_t... _ids>
+	template<typename DstArrays, typename SrcArrays, typename... _ids>
 	static inline void copy( DstArrays& dst, const SrcArrays& src, size_t start, size_t count, const FieldId<_ids>&... )
 	{
 		copy( dst, src, start, count, std::tuple<FieldId<_ids>...>() );
@@ -66,7 +66,7 @@ namespace soatl
 		copy( dst, src, start, count, typename SrcArrays::FieldIdsTuple () );
 	}
 
-	template<typename DstArrays, typename SrcArrays, size_t... _ids>
+	template<typename DstArrays, typename SrcArrays, typename... _ids>
 	static inline void copy( DstArrays& dst, const SrcArrays& src, const FieldId<_ids>&... )
 	{
 		copy( dst, src, 0, std::min(dst.size(),src.size()), typename SrcArrays::FieldIdsTuple () );

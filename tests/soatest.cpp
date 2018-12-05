@@ -15,7 +15,7 @@
 std::default_random_engine rng;
 
 // WARNING: assumes that elements in arrays support 'operator = (const size_t&)' and 'operator == (const size_t&)'
-template<typename FieldsT, size_t... _ids>
+template<typename FieldsT, typename... _ids>
 static inline void check_field_arrays_aliasing( size_t N, FieldsT& field_arrays, const soatl::FieldId<_ids>& ... fids )
 {
 	std::uniform_int_distribution<> rndist(0,N*2);

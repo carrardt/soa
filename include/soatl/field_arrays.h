@@ -19,14 +19,14 @@ be a power of two and a multiple of sizeof(void *).  If size is 0, then the valu
 namespace soatl {
 
 // TODO: add alignment
-template<size_t _Alignment, size_t _ChunkSize, size_t... ids >
+template<size_t _Alignment, size_t _ChunkSize, typename... ids >
 struct FieldArrays
 {
 	static constexpr bool assert_alignment_is_power_of_2 = AssertPowerOf2<_Alignment>::value;
-        static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
-        static constexpr size_t Alignment = (1ul<<AlignmentLog2);
-        static constexpr size_t AlignmentLowMask = Alignment - 1;
-        static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
+  static constexpr size_t AlignmentLog2 = Log2<_Alignment>::value;
+  static constexpr size_t Alignment = (1ul<<AlignmentLog2);
+  static constexpr size_t AlignmentLowMask = Alignment - 1;
+  static constexpr size_t AlignmentHighMask = ~AlignmentLowMask;
 	static constexpr size_t ChunkSize = (_ChunkSize<1) ? 1 : _ChunkSize;
 	static constexpr size_t TupleSize = sizeof...(ids);
 
@@ -39,7 +39,7 @@ struct FieldArrays
 		init( std::integral_constant<size_t,TupleSize>() );
 	}
 
-	template<size_t _id>
+	template<typename _id>
 	inline typename FieldDescriptor<_id>::value_type* __restrict__ operator [] ( FieldId<_id> ) const
 	{
 		using ValueType = typename FieldDescriptor<_id>::value_type;
@@ -117,14 +117,14 @@ private:
 	size_t m_capacity = 0;
 };
 
-template<size_t... ids>
+template<typename... ids>
 inline
 FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...> make_field_arrays(const FieldId<ids>& ...)
 {
 	return FieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>();
 }
 
-template<size_t A, size_t C,size_t... ids>
+template<size_t A, size_t C,typename... ids>
 inline
 FieldArrays<A,C,ids...> make_field_arrays(cst::align<A>, cst::chunk<C>, const FieldId<ids>& ...)
 {

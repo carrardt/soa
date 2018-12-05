@@ -14,7 +14,7 @@
 namespace soatl {
 
 
-template<size_t A, size_t TI, size_t capacity, size_t... ids>
+template<size_t A, size_t TI, size_t capacity, typename... ids>
 struct StaticPackedFieldArraysHelper
 {
 	static constexpr size_t Alignment = A;
@@ -25,13 +25,13 @@ struct StaticPackedFieldArraysHelper
 				        + ( ( capacity * sizeof(ElementType) ) + AlignmentLowMask ) & AlignmentHighMask;
 };
 
-template<size_t A, size_t capacity, size_t... ids>
+template<size_t A, size_t capacity, typename... ids>
 struct StaticPackedFieldArraysHelper<A,0,capacity,ids...>
 {
 	static constexpr size_t offset = 0;
 };
 
-template< size_t _Alignment, size_t _ChunkSize, size_t _NChunks, size_t... ids>
+template< size_t _Alignment, size_t _ChunkSize, size_t _NChunks, typename... ids>
 struct alignas(_Alignment) StaticPackedFieldArrays
 {
 	static constexpr bool assert_alignment_is_power_of_2 = AssertPowerOf2<_Alignment>::value;
@@ -49,7 +49,7 @@ struct alignas(_Alignment) StaticPackedFieldArrays
 	using LastValueType = typename std::tuple_element<TupleSize-1,std::tuple< typename FieldDescriptor<ids>::value_type ... > >::type ;
 	static constexpr size_t AllocationSize = StaticPackedFieldArraysHelper<Alignment,TupleSize-1,Size,ids...>::offset + Size * sizeof(LastValueType);
 
-	template<size_t _id>
+	template<typename _id>
 	inline typename FieldDescriptor<_id>::value_type * __restrict__ operator [] ( FieldId<_id> ) 
 	{
 		static constexpr size_t index = find_index_of_id<_id,ids...>::index;
@@ -58,7 +58,7 @@ struct alignas(_Alignment) StaticPackedFieldArrays
 		return (ValueType* __restrict__) __builtin_assume_aligned( aptr , Alignment );
 	}
 
-	template<size_t _id>
+	template<typename _id>
 	inline const typename FieldDescriptor<_id>::value_type * __restrict__ operator [] ( FieldId<_id> ) const
 	{
 		static constexpr size_t index = find_index_of_id<_id,ids...>::index;
@@ -82,7 +82,7 @@ private:
 	uint8_t m_storage[ AllocationSize ];
 };
 
-template<size_t A, size_t C, size_t N, size_t... ids>
+template<size_t A, size_t C, size_t N, typename... ids>
 inline
 StaticPackedFieldArrays<A,C,(N+C-1)/C,ids...>
 make_static_packed_field_arrays( cst::align<A>, cst::chunk<C>, cst::count<N>, const FieldId<ids>& ...)
@@ -90,7 +90,7 @@ make_static_packed_field_arrays( cst::align<A>, cst::chunk<C>, cst::count<N>, co
 	return StaticPackedFieldArrays<A,C,(N+C-1)/C,ids...>();
 }
 
-template<size_t N, size_t... ids>
+template<size_t N, typename... ids>
 inline
 StaticPackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,(N+DEFAULT_CHUNK_SIZE-1)/DEFAULT_CHUNK_SIZE,ids...>
 make_static_packed_field_arrays( cst::count<N>, const FieldId<ids>& ...)

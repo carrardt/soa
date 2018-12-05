@@ -3,6 +3,8 @@
 #include <random>
 #include <cmath>
 #include <chrono>
+#include <atomic>
+#include <omp.h>
 
 #include "soatl/field_descriptor.h"
 #include "soatl/field_arrays.h"
@@ -30,6 +32,10 @@
 #define TEST_DOUBLE_PRECISION 1
 #endif
 
+#ifndef TEST_ENABLE_OPENMP
+#define TEST_ENABLE_OPENMP 1
+#endif
+
 #if TEST_DOUBLE_PRECISION
 auto field_e = particle_e;
 auto field_rx = particle_rx;
@@ -44,10 +50,10 @@ auto field_rz = particle_rz_f;
 
 std::default_random_engine rng;
 
-template<typename ArraysT, size_t idDist, size_t idRx, size_t idRy, size_t idRz>
+template<typename ArraysT, typename idDist, typename idRx, typename idRy, typename idRz>
 inline double benchmark(ArraysT& arrays, size_t N, soatl::FieldId<idDist> dist, soatl::FieldId<idRx> rx, soatl::FieldId<idRy> ry, soatl::FieldId<idRz> rz)
 {
-  static constexpr size_t nCycles = 100;
+  static constexpr size_t nCycles = 10;
   using DistT = typename soatl::FieldDescriptor<idDist>::value_type;
   using PosT = typename soatl::FieldDescriptor<idRx>::value_type;
 
@@ -70,29 +76,37 @@ inline double benchmark(ArraysT& arrays, size_t N, soatl::FieldId<idDist> dist, 
     PosT ay = arrays[ry][0];
     PosT az = arrays[rz][0];
 
+#define COMPUTE_KERNEL \
+  x = x - ax; \
+	y = y - ay; \
+	z = z - az; \
+	d = std::sqrt( x*x + y*y + z*z ); \
+	x /= d; \
+	y /= d; \
+	z /= d; \
+	d *= x/(y*z)
+
     auto t1 = std::chrono::high_resolution_clock::now();
-#   if TEST_USE_SIMD 
-	    soatl::apply_simd( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z)
-		    {
-			    x = x - ax;
-			    y = y - ay;
-			    z = z - az;
-			    d = std::sqrt( x*x + y*y + z*z );
-		    }
-		    , arrays, dist, rx, ry, rz );
+#   if TEST_USE_SIMD
+#     if TEST_ENABLE_OPENMP
+	    soatl::parallel_apply_simd( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z) { COMPUTE_KERNEL; }
+		                            , arrays, dist, rx, ry, rz );
+#     else
+	    soatl::apply_simd( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z) { COMPUTE_KERNEL; }
+		                   , arrays, dist, rx, ry, rz );
+#     endif
 #   else
-	    soatl::apply( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z)
-		    {
-			    x = x - ax;
-			    y = y - ay;
-			    z = z - az;
-			    d = std::sqrt( x*x + y*y + z*z );
-		    }
-		    , arrays, dist, rx, ry, rz );
+#     if TEST_ENABLE_OPENMP
+	    soatl::parallel_apply( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z) { COMPUTE_KERNEL; }
+		                       , arrays, dist, rx, ry, rz );
+#     else
+	    soatl::apply( [ax,ay,az](DistT& d, PosT x, PosT y, PosT z) { COMPUTE_KERNEL; }
+		              , arrays, dist, rx, ry, rz );
+#     endif
 #   endif
     auto t2 = std::chrono::high_resolution_clock::now();
     timens += t2-t1;
-    		  
+
     // try to optimize this out, compiler !
     for(size_t i=0;i<N;i++)
     {
@@ -144,6 +158,15 @@ int main(int argc, char* argv[])
     std::cout<<" a="<< soatl::SimdRequirements<double>::alignment <<" c=" << soatl::SimdRequirements<double>::chunksize;
 # else
     std::cout<<" a="<< soatl::SimdRequirements<float>::alignment <<" c=" << soatl::SimdRequirements<float>::chunksize;
+# endif
+
+# if TEST_ENABLE_OPENMP
+    std::atomic<int> n_threads(0);
+#   pragma omp parallel
+    {
+      n_threads = omp_get_num_threads();
+    }
+    std::cout<<", omp="<<n_threads;
 # endif
 
   std::cout<<", type=";

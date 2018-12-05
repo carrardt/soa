@@ -1,18 +1,23 @@
 #pragma once
 
 #include <cstdlib> // for size_t
+#include <type_traits>
 
 namespace soatl
 {
 
-template<size_t _id> struct FieldId { static constexpr size_t id =_id; };
-template<size_t _index> struct FieldIndex { static constexpr size_t index = _index; };
-template<size_t _id> struct FieldDescriptor {};
+template<typename _field_id> struct FieldDescriptor
+{
+  using value_type = void;
+  using Id = _field_id;
+  static const char* name() { return "<uknown>"; }
+};
+template<typename T> using FieldId = FieldDescriptor<T>; // for backward compatiblity
 
-template<size_t k, size_t... ids> struct find_index_of_id {};
-template<size_t k, size_t f, size_t... ids>
-struct find_index_of_id<k,f,ids...> { static constexpr size_t index = (k==f) ? 0 : (1+find_index_of_id<k,ids...>::index) ; };
-template<size_t k>
+template<typename k, typename... ids> struct find_index_of_id {};
+template<typename k, typename f, typename... ids>
+struct find_index_of_id<k,f,ids...> { static constexpr size_t index = std::is_same<k,f>::value ? 0 : (1+find_index_of_id<k,ids...>::index) ; };
+template<typename k>
 struct find_index_of_id<k> { static constexpr size_t index = 0; };
 
 }

@@ -14,7 +14,7 @@
 
 namespace soatl {
 
-template<size_t A, size_t TI, size_t... ids>
+template<size_t A, size_t TI, typename... ids>
 struct PackedFieldArraysHelper
 {
 	static constexpr size_t Alignment = A;
@@ -29,7 +29,7 @@ struct PackedFieldArraysHelper
 	}
 };
 
-template<size_t A, size_t... ids>
+template<size_t A, typename... ids>
 struct PackedFieldArraysHelper<A,0,ids...>
 {
 	static inline constexpr size_t field_offset(size_t) { return 0; }
@@ -39,7 +39,7 @@ struct PackedFieldArraysHelper<A,0,ids...>
 };
 
 
-template< size_t _Alignment, size_t _ChunkSize, size_t... ids>
+template< size_t _Alignment, size_t _ChunkSize, typename... ids>
 struct PackedFieldArrays
 {
 	static constexpr bool assert_alignment_is_power_of_2 = AssertPowerOf2<_Alignment>::value;
@@ -64,7 +64,7 @@ struct PackedFieldArrays
 		return (ValueType* __restrict__) __builtin_assume_aligned( aptr , Alignment );
 	}
 
-	template<size_t _id>
+	template<typename _id>
 	inline typename FieldDescriptor<_id>::value_type * __restrict__ operator [] ( FieldId<_id> ) const
 	{
 		static constexpr size_t index = find_index_of_id<_id,ids...>::index;
@@ -146,7 +146,7 @@ private:
 	size_t m_capacity = 0;
 };
 
-template<size_t... ids>
+template<typename... ids>
 inline
 PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>
 make_packed_field_arrays(const FieldId<ids>& ...)
@@ -154,7 +154,7 @@ make_packed_field_arrays(const FieldId<ids>& ...)
 	return PackedFieldArrays<DEFAULT_ALIGNMENT,DEFAULT_CHUNK_SIZE,ids...>();
 }
 
-template<size_t A, size_t C, size_t... ids>
+template<size_t A, size_t C, typename... ids>
 inline
 PackedFieldArrays<A,C,ids...>
 make_packed_field_arrays( cst::align<A>, cst::chunk<C>, const FieldId<ids>& ...)

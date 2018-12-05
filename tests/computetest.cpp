@@ -33,7 +33,7 @@ static inline void compute_distance_d( double& dist, double x, double y, double 
 	dist = /*std::exp(x2+y2+z2) / std::sqrt*/ ( x*x + y*y + z*z );
 }
 
-template<typename T, size_t id>
+template<typename T, typename id>
 static inline void print_field_info(const T& arrays, soatl::FieldId<id> f)
 {
 	auto ptr = arrays[f];
@@ -41,7 +41,7 @@ static inline void print_field_info(const T& arrays, soatl::FieldId<id> f)
 }
 
 
-template<size_t A, size_t C, size_t N, size_t... ids>
+template<size_t A, size_t C, size_t N, typename... ids>
 static inline void check_static_fields( soatl::StaticPackedFieldArrays<A,C,N,ids...>& field_arrays)
 {
 	size_t alignment = field_arrays.alignment();

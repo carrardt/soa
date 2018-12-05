@@ -17,7 +17,7 @@
 std::default_random_engine rng;
 
 
-template<typename T, size_t id>
+template<typename T, typename id>
 static inline void print_field_info(const T& arrays, soatl::FieldId<id> f)
 {
 	auto ptr = arrays[f];
