@@ -84,7 +84,7 @@ inline double benchmark(ArraysT& arrays, size_t N, soatl::FieldId<idDist> dist, 
 	x /= d; \
 	y /= d; \
 	z /= d; \
-	d *= x/(y*z)
+	d += x/(y*z)
 
     auto t1 = std::chrono::high_resolution_clock::now();
 #   if TEST_USE_SIMD
